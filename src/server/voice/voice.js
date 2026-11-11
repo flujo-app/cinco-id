@@ -11,13 +11,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 
 // How the robot voice should say names it would otherwise guess at (ARPABET sounds).
 const BASE_LEXICON = {
-  tayne: 'T EY N',
-  beta: 'B EY T AH',
-  oyster: 'OY S T ER',
-  celery: 'S EH L ER IY',
-  moe: 'M OW',
-  sequence: 'S IY K W AH N S',
-  sequences: 'S IY K W AH N S IH Z',
+  tayne: 'T EY1 N',
 };
 
 /** Whatever the microphone recorded becomes the plain format the recogniser wants. */
