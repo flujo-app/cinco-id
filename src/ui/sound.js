@@ -157,6 +157,53 @@ export function setMuted(value) { muted = value; if (value) { quiet(); play('rin
 export function voiceLog() { return spoken.slice(-40); }
 export function isMuted() { return muted; }
 
+// ---------- recording the app's own sound (for demo videos) ----------
+// While a recording runs, everything the app plays (voice, effects, music) also goes into a
+// sound track. Nothing else on the PC is captured. In normal use none of this is active.
+
+let tap = null;
+let voiceBus = null;
+let recorder = null;
+
+/** Sends a voice sound file through the recording track too, when a recording is running. */
+function wire(player) {
+  if (!tap) return;
+  try { audio().createMediaElementSource(player).connect(voiceBus); } catch { /* it still plays directly */ }
+}
+
+/** Starts recording the app's sound. Resolves with the clock time at which the track begins. */
+export function startRecording() {
+  const ctx = audio();
+  tap = ctx.createMediaStreamDestination();
+  master.connect(tap);
+  voiceBus = ctx.createGain();
+  voiceBus.connect(ctx.destination);
+  voiceBus.connect(tap);
+  recorder = new MediaRecorder(tap.stream, { mimeType: 'audio/webm;codecs=opus', audioBitsPerSecond: 160_000 });
+  recorder.chunks = [];
+  recorder.ondataavailable = event => { if (event.data.size) recorder.chunks.push(event.data); };
+  return new Promise(resolve => {
+    recorder.onstart = () => resolve(Date.now());
+    recorder.start(1000);
+  });
+}
+
+/** Stops the recording and returns the sound track (WebM/Opus) as base64 text. */
+export function stopRecording() {
+  return new Promise(resolve => {
+    if (!recorder) return resolve(null);
+    recorder.onstop = () => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result).split(',')[1] ?? null);
+      reader.readAsDataURL(new Blob(recorder.chunks, { type: 'audio/webm' }));
+      try { master.disconnect(tap); } catch { /* already gone */ }
+      tap = null;
+      recorder = null;
+    };
+    recorder.stop();
+  });
+}
+
 /** Plays one sample of a voice for the Setup window: a sound file, or the browser voice saying `text`. */
 export async function sample(blob, text) {
   if (muted) return;
@@ -166,6 +213,7 @@ export async function sample(blob, text) {
   try {
     await new Promise(resolve => {
       const player = new Audio(url);
+      wire(player);
       player.onended = resolve;
       player.onerror = resolve;
       player.play().catch(resolve);
@@ -199,6 +247,7 @@ async function serverSpeak(text) {
   const url = URL.createObjectURL(await response.blob());
   const outcome = await new Promise(resolve => {
     const player = new Audio(url);
+    wire(player);
     player.onended = () => resolve('played');
     player.onerror = () => resolve('could not be played');
     current = { stop: () => { player.pause(); resolve('stopped'); } };

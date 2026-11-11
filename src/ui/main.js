@@ -10,7 +10,8 @@ document.body.classList.toggle('overlay', overlay);
 if (query.has('silent')) sound.setMuted(true); // for tests: no voice, no music
 
 const stage = new Stage();
-window.betaSequence = { clipStatus, voiceLog: sound.voiceLog }; // for the checks in test/ui
+// For the checks in test/ui and for recording demo videos (tools/demo).
+window.betaSequence = { clipStatus, voiceLog: sound.voiceLog, startRecording: sound.startRecording, stopRecording: sound.stopRecording };
 let socket = null;
 let operator = 'Operator';
 let voice = { speak: 'server', listen: false };
