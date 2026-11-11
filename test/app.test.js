@@ -23,6 +23,8 @@ async function start(extra = {}) {
       voice: { tts: { engine: 'browser' }, stt: { engine: 'off' } },
       events: { whatsapp: { secret: SECRET, messages: 'sender' } },
       ...(extra.overrides ?? {}),
+      // Printouts always stay in the test's own folder, whatever else a test changes about them.
+      printouts: { dir: path.join(temp, 'printouts'), ...(extra.overrides?.printouts ?? {}) },
     },
     parts: { brain: null, generator: null, ...(extra.parts ?? {}) },
   });
@@ -178,8 +180,7 @@ test('printouts are handed to the Windows printer when printing is on, and not w
     assert.equal((await fetch(`${on.base}/print/..%2Fsecret.png`)).status, 404);
   } finally { await on.stop(); }
 
-  const off = await start({ parts: { printer }, overrides: { printouts: { print: 'off' } } });
-  try {
+  const off = await start({ parts: { printer }, overrides: { printouts: { print: 'off' } } });  try {
     const result = await (await post(off.base)).json();
     assert.equal(result.printing, null);
     assert.equal(jobs.length, 1, 'nothing more was printed');
