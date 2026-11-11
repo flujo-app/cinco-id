@@ -11,7 +11,7 @@ if (query.has('silent')) sound.setMuted(true); // for tests: no voice, no music
 
 const stage = new Stage();
 // For the checks in test/ui and for recording demo videos (tools/demo).
-window.betaSequence = { clipStatus, voiceLog: sound.voiceLog, startRecording: sound.startRecording, stopRecording: sound.stopRecording };
+window.betaSequence = { clipStatus, voiceLog: sound.voiceLog, musicStatus: sound.musicStatus, startRecording: sound.startRecording, stopRecording: sound.stopRecording };
 let socket = null;
 let operator = 'Operator';
 let voice = { speak: 'server', listen: false };

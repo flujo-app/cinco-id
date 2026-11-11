@@ -1,15 +1,17 @@
-// All sound is made on the spot: beeps, the phone ring, the printer, the disco music and
-// the queue for the computer's voice. No sound files needed.
+// The app's sound: beeps, the phone ring and the printer are made on the spot; the disco music
+// is three real loops in ./music (with a small band made on the spot as the fallback); and the
+// queue for the computer's voice.
 
 let context = null;
 let master = null;
 let musicGain = null;
+const MASTER_LEVEL = 0.5;
 
 function audio() {
   if (!context) {
     context = new AudioContext();
     master = context.createGain();
-    master.gain.value = 0.5;
+    master.gain.value = muted ? 0 : MASTER_LEVEL; // muted means everything, whatever is started
     master.connect(context.destination);
     musicGain = context.createGain();
     musicGain.gain.value = 0;
@@ -86,7 +88,145 @@ export function play(name) {
   try { SOUNDS[name]?.(); } catch { /* sound is a nicety */ }
 }
 
-// ---------- disco music: a small looping band ----------
+// ---------- disco music ----------
+// Three real disco loops, one per disco level, made with the open music model ACE-Step 1.5
+// (see music/music.json and docs/MEDIA.md). They share tempo and length, so "more disco" blends
+// into the next one in time. If they cannot be loaded or decoded, the small band below plays
+// instead, as before.
+
+const TRACK_LEVEL = 1; // the loops carry their own loudness steps per level
+const SWITCH_SECONDS = 1; // the blend from one level to the next
+const MUSIC_DIR = new URL('music/', import.meta.url);
+let tracks = null; // { buffers: Map(level -> AudioBuffer), seconds } once loaded
+let trackLoad = null; // the loading, started once
+let trackError = null; // why the loops could not be used (then the band plays)
+let trackPlayer = null; // { source, gain, level } of the loop playing now
+let trackClock = 0; // the context time at which the loops were at their start
+let bandStop = null;
+
+function loadTracks() {
+  if (trackLoad) return trackLoad;
+  trackLoad = (async () => {
+    const response = await fetch(new URL('music.json', MUSIC_DIR));
+    if (!response.ok) throw new Error(`music.json: HTTP ${response.status}`);
+    const list = await response.json();
+    const buffers = new Map();
+    await Promise.all([1, 2, 3].map(async level => {
+      const entry = list.tracks?.find(track => track.level === level);
+      if (!entry || !/^[\w.-]+$/.test(entry.file ?? '')) throw new Error(`no loop listed for level ${level}`);
+      const file = await fetch(new URL(entry.file, MUSIC_DIR));
+      if (!file.ok) throw new Error(`${entry.file}: HTTP ${file.status}`);
+      const buffer = await audio().decodeAudioData(await file.arrayBuffer());
+      if (!(buffer.duration > 1)) throw new Error(`${entry.file} is empty`);
+      buffers.set(level, buffer);
+    }));
+    tracks = { buffers, seconds: buffers.get(1).duration };
+    return tracks;
+  })().catch(error => {
+    trackError = String(error?.message ?? error);
+    tracks = null;
+    return null;
+  });
+  return trackLoad;
+}
+
+/** Starts the loop for `level` in time with the loops' clock, blending over `fade` seconds. */
+function playTrack(level, fade) {
+  const ctx = audio();
+  const buffer = tracks?.buffers.get(level);
+  if (!buffer) return;
+  const at = ctx.currentTime + 0.03;
+  const source = ctx.createBufferSource();
+  source.buffer = buffer;
+  source.loop = true;
+  const gain = ctx.createGain();
+  source.connect(gain).connect(musicGain);
+  if (fade) {
+    gain.gain.setValueAtTime(0, at);
+    gain.gain.linearRampToValueAtTime(1, at + fade);
+  }
+  const offset = (((at - trackClock) % buffer.duration) + buffer.duration) % buffer.duration;
+  source.start(at, offset);
+  const old = trackPlayer;
+  trackPlayer = { source, gain, level };
+  if (old) {
+    old.gain.gain.cancelScheduledValues(at);
+    old.gain.gain.setValueAtTime(old.gain.gain.value, at);
+    old.gain.gain.linearRampToValueAtTime(0, at + fade);
+    old.source.onended = () => old.source.disconnect();
+    try { old.source.stop(at + fade + 0.05); } catch { /* already stopped */ }
+  }
+}
+
+function stopTrack() {
+  if (!trackPlayer) return;
+  try { trackPlayer.source.stop(); } catch { /* already stopped */ }
+  trackPlayer.source.disconnect();
+  trackPlayer = null;
+}
+
+function startSynth() {
+  if (musicTimer) return;
+  const ctx = audio();
+  nextStepTime = ctx.currentTime + 0.1;
+  musicStep = 0; // always start at the top of the phrase
+  musicTimer = setInterval(() => {
+    while (nextStepTime < audio().currentTime + 0.25) {
+      scheduleStep(musicStep++, nextStepTime);
+      nextStepTime += STEP;
+    }
+  }, 60);
+}
+
+/** The music came on: the loops if they are (or become) ready, otherwise the band. */
+function startBand() {
+  clearTimeout(bandStop);
+  if (trackPlayer || musicTimer) return; // still playing: it was switched off and on again quickly
+  loadTracks().then(ready => {
+    try {
+      if (!musicOn || trackPlayer || musicTimer) return;
+      if (ready) {
+        trackClock = audio().currentTime + 0.03; // always start at the top of the loop
+        playTrack(discoLevel, 0);
+      } else {
+        startSynth();
+        rampMusic(musicLevel(), 0.3); // the band is set a little louder than the loops
+      }
+    } catch { /* sound is a nicety */ }
+  });
+}
+
+function stopBandSoon() {
+  clearTimeout(bandStop);
+  bandStop = setTimeout(() => {
+    if (musicOn) return;
+    stopTrack();
+    if (musicTimer) { clearInterval(musicTimer); musicTimer = null; }
+  }, 700);
+}
+
+function rampMusic(value, seconds) {
+  const ctx = audio();
+  musicGain.gain.cancelScheduledValues(ctx.currentTime);
+  musicGain.gain.linearRampToValueAtTime(value, ctx.currentTime + seconds);
+}
+
+/** For the music check in test/ui: what the music is doing, without changing anything. */
+export function musicStatus() {
+  return {
+    on: musicOn,
+    level: discoLevel,
+    playing: trackPlayer ? 'loops' : musicTimer ? 'band' : 'nothing',
+    loop: trackPlayer ? { level: trackPlayer.level, looping: trackPlayer.source.loop, seconds: trackPlayer.source.buffer?.duration ?? 0 } : null,
+    loaded: tracks ? [...tracks.buffers].map(([level, buffer]) => ({ level, seconds: buffer.duration, sampleRate: buffer.sampleRate, channels: buffer.numberOfChannels })).sort((a, b) => a.level - b.level) : [],
+    error: trackError,
+    context: context ? { state: context.state, time: context.currentTime, sampleRate: context.sampleRate } : null,
+    muted,
+    volume: master ? master.gain.value : null,
+  };
+}
+
+// ---------- the fallback: a small looping band ----------
 // An original eight-bar disco groove, played by the app itself: four-on-the-floor kick, claps on
 // two and four, open hi-hats on the off-beats, an octave-jumping bass, choppy rhythm chords, a
 // string pad with a rising run at the end of the phrase, a little hook and the odd "pew" drum.
@@ -202,17 +342,23 @@ function scheduleStep(step, time) {
   }
 }
 
-let discoLevel = 1; // 1 to 3; every "more disco" adds a layer and a little volume
-const musicLevel = () => MUSIC_LEVEL * (1 + 0.12 * (discoLevel - 1));
+let discoLevel = 1; // 1 to 3; every "more disco" moves to the next loop (the band adds a layer)
+// The loops carry their own loudness; the band gets a little louder per level.
+const musicLevel = () => (trackError || musicTimer ? MUSIC_LEVEL * (1 + 0.12 * (discoLevel - 1)) : TRACK_LEVEL);
 
 /** One more layer of disco, up to the maximum. Returns the level now playing. */
 export function moreDisco() {
+  const before = discoLevel;
   discoLevel = Math.min(3, discoLevel + 1);
-  if (musicOn && musicGain) {
-    const ctx = audio();
-    musicGain.gain.cancelScheduledValues(ctx.currentTime);
-    musicGain.gain.linearRampToValueAtTime(musicLevel(), ctx.currentTime + 0.3);
-  }
+  try {
+    if (musicOn && musicGain) {
+      if (trackPlayer) {
+        if (discoLevel !== before) playTrack(discoLevel, SWITCH_SECONDS); // the loops get louder by themselves
+      } else {
+        rampMusic(musicLevel(), 0.3); // the band: a little louder per level, as before
+      }
+    }
+  } catch { /* sound is a nicety */ }
   return discoLevel;
 }
 
@@ -222,18 +368,10 @@ export function music(on) {
   musicOn = on;
   musicGain.gain.cancelScheduledValues(ctx.currentTime);
   musicGain.gain.linearRampToValueAtTime(on ? musicLevel() : 0, ctx.currentTime + 0.6);
-  if (on && !musicTimer) {
-    nextStepTime = ctx.currentTime + 0.1;
-    musicStep = 0; // always start at the top of the phrase
-    musicTimer = setInterval(() => {
-      while (nextStepTime < audio().currentTime + 0.25) {
-        scheduleStep(musicStep++, nextStepTime);
-        nextStepTime += STEP;
-      }
-    }, 60);
-  } else if (!on && musicTimer) {
-    setTimeout(() => { if (!musicOn) { clearInterval(musicTimer); musicTimer = null; } }, 700);
-  }
+  try {
+    if (on) startBand();
+    else stopBandSoon();
+  } catch { /* sound is a nicety */ }
 }
 
 export function isMusicOn() { return musicOn; }
@@ -256,7 +394,11 @@ let muted = false;
 const spoken = []; // what was said aloud and how it went, for the voice check
 
 export function setVoiceMode(next) { mode = next; }
-export function setMuted(value) { muted = value; if (value) { quiet(); play('ring-stop'); } }
+export function setMuted(value) {
+  muted = value;
+  if (master) master.gain.value = value ? 0 : MASTER_LEVEL;
+  if (value) { quiet(); play('ring-stop'); }
+}
 export function voiceLog() { return spoken.slice(-40); }
 export function isMuted() { return muted; }
 
@@ -388,4 +530,4 @@ export function quiet() {
 }
 
 /** Browsers only allow sound after the first click or key press. */
-export function unlock() { audio(); }
+export function unlock() { audio(); loadTracks(); }
