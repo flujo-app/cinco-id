@@ -1,5 +1,5 @@
 // The desktop shell: starts the computer and shows its screen, either as a normal window with
-// its own Win95 desktop, or as a see-through layer on top of your real desktop ("overlay").
+// its own light blue desktop, or as a see-through layer on top of your real desktop ("overlay").
 import { app, BrowserWindow, Menu, Tray, dialog, globalShortcut, ipcMain, nativeImage, safeStorage, screen, session, shell } from 'electron';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';

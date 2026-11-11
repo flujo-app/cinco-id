@@ -1,13 +1,13 @@
 {
   "name": "cinco-id",
-  "version": "2.5.2",
+  "version": "2.5.3",
   "private": true,
   "productName": "CINCO ID",
   "license": "MIT",
   "author": "flujo-app",
   "homepage": "https://github.com/flujo-app/cinco-id",
   "type": "module",
-  "description": "Cinco Identity Generator 2.5: a talking Win95-style computer that loads dancing sequences, opens far too many windows and can do real work.",
+  "description": "Cinco Identity Generator 2.5: a talking computer in the look of a certain sketch that loads dancing sequences, opens far too many windows and can do real work.",
   "main": "src/shell/main.js",
   "scripts": {
     "start": "electron .",

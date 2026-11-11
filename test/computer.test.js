@@ -72,8 +72,8 @@ test('the whole routine from the sketch works line by line', async () => {
     'as in the sketch: the whole dancer on white and a close-up on pink');
 
   await computer.hear('Could you kick up the 4d3d3d3?');
-  assert.equal(lastSaid(), '4d3d3d3 engaged.');
-  assert.equal(actions.findLast(action => action.type === 'say').speak, 'four dee three dee three dee three engaged.');
+  assert.equal(lastSaid(), '4d3d3d3 Engaged.');
+  assert.equal(actions.findLast(action => action.type === 'say').speak, 'four dee three dee three dee three Engaged.');
   assert.ok(windows('sequence').length > 20, 'kicking it up opens a lot of windows');
   assert.ok(windows('sequence').every(window => window.sequence.name === 'Celery Man'), 'copies of what is on screen');
 
@@ -207,7 +207,7 @@ test('it is a general tool, not only the routine', async () => {
   await computer.hear('rainbow on oyster');
   assert.equal(lastSaid(), 'Yes.');
   await computer.hear('kick up the oyster');
-  assert.equal(lastSaid(), 'Oyster engaged.');
+  assert.equal(lastSaid(), 'Oyster Engaged.');
   assert.ok(computer.sequenceWindows('4d3d3d3/oyster').length > 5);
 
   await computer.hear('load up something that does not exist');
@@ -221,7 +221,7 @@ test('it is a general tool, not only the routine', async () => {
   assert.equal(computer.sequenceWindows().length, 0);
 
   await computer.hear('kick up the four d three d three d three');
-  assert.equal(lastSaid(), '4d3d3d3 engaged.');
+  assert.equal(lastSaid(), '4d3d3d3 Engaged.');
   const names = new Set(computer.sequenceWindows().map(window => window.sequence.name));
   assert.deepEqual([...names].sort(), ['Celery Head', 'Celery Man', 'Oyster'], 'the beta sequence stays hidden until asked for');
 

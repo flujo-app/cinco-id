@@ -76,7 +76,7 @@ try {
   await say('normal', 'Yes.');
   await picture('celery-man');
 
-  await say('Could you kick up the 4d3d3d3?', '4d3d3d3 engaged.', 2200);
+  await say('Could you kick up the 4d3d3d3?', '4d3d3d3 Engaged.', 2200);
   assert.ok(await count('.window.kind-sequence') > 20, 'kicking it up fills the screen');
   await picture('engaged');
 

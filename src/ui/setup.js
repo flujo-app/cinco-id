@@ -1,4 +1,4 @@
-// The Setup window: a Win95-style wizard (Back / Next / Finish) that sets the computer up without
+// The Setup window: a wizard (Back / Next / Finish) that sets the computer up without
 // editing a text file. It only talks to this computer's own local server; keys typed here go to
 // the server once and are never shown again.
 
@@ -213,7 +213,7 @@ export function buildSetup(record, context) {
     function welcome() {
       title('Welcome to CINCO ID Setup');
       para('This gets the computer ready in a few steps. Nothing here is required: press Next to skip anything you do not need. '
-        + 'You can open Setup again any time from the Start menu, or by saying "setup".');
+        + 'You can open Setup again any time from the Menu button, or by saying "setup".');
       const box = group('Your name');
       field(box, 'What should the computer call you?', textInput(draft.operator, value => { draft.operator = value; }, { name: 'operator', max: 40 }));
       if (settings.operatorFromEnv) box.append(el('div', 'setup-hint', 'Right now the name comes from CINCO_ID_OPERATOR, which wins over this setting.'));
