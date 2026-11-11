@@ -1,0 +1,43 @@
+{
+  "project": "projects/4d3d3d3",
+  "note": "Invented people only. Seeds are fixed so the pictures can be made again exactly.",
+  "sequences": [
+    {
+      "id": "celery-man",
+      "name": "Celery Man",
+      "seed": 4318,
+      "expressions": [
+        "smiling"
+      ],
+      "prompt": "Celery Man: an ordinary, slightly awkward office worker in his thirties with short neat hair, wearing a baggy grey early-1990s suit with big shoulders, a white shirt, a celery-green tie and sensible brown shoes. Dance: an earnest side-to-side office-party shuffle, stepping left and right with stiff arms and a shy, concentrated face"
+    },
+    {
+      "id": "oyster",
+      "name": "Oyster",
+      "seed": 2208,
+      "expressions": [
+        "smiling"
+      ],
+      "prompt": "Oyster: a cheerful person in their late twenties wearing a shiny pearl-grey satin shirt, dark slacks, black shoes and a pearl necklace. Dance: a smooth, happy groove, swaying the hips and shoulders and snapping the fingers"
+    },
+    {
+      "id": "tayne",
+      "name": "Tayne",
+      "seed": 9002,
+      "expressions": [
+        "smiling"
+      ],
+      "prompt": "Tayne: a flamboyant stage entertainer in his forties wearing a sparkly teal sequinned jumpsuit, white boots and a very large wide-brimmed dark navy hat sitting clearly on top of his head. Dance: a confident strut on the spot, swinging the hips and rolling the shoulders"
+    },
+    {
+      "id": "tayne/nude",
+      "name": "Tayne (beach costume)",
+      "seed": 9002,
+      "expressions": [],
+      "prompt": "Tayne in his silly beach costume: the same flamboyant entertainer in his forties, clean-shaven, now wearing a bright lime-green sling-style one-piece comedy swimsuit with two wide straps over the shoulders, and a big puffy yellow inflatable rubber-duck swim ring worn around his hips that completely hides everything from the belly button down to the upper thighs, together with the same white boots and the same very large wide-brimmed dark navy hat sitting on top of his head. A goofy, non-sexual beach gag costume. Dance: a confident strut on the spot, swinging the hips and rolling the shoulders",
+      "like": "tayne",
+      "likeStrength": 0.75,
+      "likeTint": "#e2b48f"
+    }
+  ]
+}
