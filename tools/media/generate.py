@@ -6,6 +6,7 @@
                                    [--resolution 480p|720p|768p] [--dry-run]
                                    [--stills-only | --from-still] [--max-cost 1.5]
     python tools/media/generate.py --prepare      # one-time download and checks, no graphics card
+    python tools/media/generate.py --prepare --dry-run   # what --prepare would download, and its cost
 
 Prints one JSON object per line on stdout while it works and finishes with
 {"done": true, "media": "<path to media.json>", "costUsdEstimate": 0.31}.
@@ -13,7 +14,9 @@ On failure prints {"error": "<plain reason>"} and exits with a non-zero code.
 
 Engines for the dance step:
   wan         Wan2.2 (open model) on our own Modal cloud graphics card.
-  ltx         LTX-2.5 (open model) on our own Modal cloud graphics card. The default.
+  ltx         LTX-2.5 (open model) on our own Modal cloud graphics card. The default: it uses the
+              owner's existing copy if this Modal account has it, else the copy --prepare
+              downloads. If neither is ready but Wan2.2 is, the default run uses Wan2.2 and says so.
   openrouter  A hosted model through OpenRouter (default model Seedance 2.5; any catalogue model
               that takes a first and last frame, e.g. minimax/hailuo-3-max). Paid per clip with the
               owner's key, read only from the OPENROUTER_API_KEY environment variable.
@@ -39,6 +42,7 @@ HERE = Path(__file__).resolve().parent
 if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
 
+import media_route as R  # noqa: E402
 import media_settings as S  # noqa: E402
 
 REPO_ROOT = HERE.parent.parent
@@ -150,9 +154,26 @@ def remote_step(work: Path | None, label: str, request, run):
     return result
 
 
+def account_state() -> dict:
+    """What this Modal account already has (free look-ups; nothing is started or created)."""
+    with contextlib.redirect_stdout(sys.stderr):
+        return R.inspect_account()
+
+
+def configure_cloud(state: dict) -> None:
+    """Tell the cloud module which LTX storage to use. Must happen before it is first imported."""
+    settings = R.cloud_settings(state)
+    loaded = sys.modules.get("media_cloud")
+    if loaded is not None and loaded.LTX_VOLUME_NAME != settings[R.CLOUD_LTX_VOLUME]:
+        raise Failure("The cloud tools were already set up for another storage; please run the command again.")
+    os.environ.update(settings)
+
+
 @contextlib.contextmanager
 def cloud():
     """An ephemeral Modal app: it exists only inside this block, so nothing is left running."""
+    if R.CLOUD_LTX_VOLUME not in os.environ:
+        configure_cloud(account_state())
     with contextlib.redirect_stdout(sys.stderr):
         import media_cloud as C
         with C.app.run():
@@ -343,9 +364,24 @@ def dry_run(args, engine: str, expressions: list[str], seed: int) -> dict:
     drawing_usd = 0.0 if args.from_still else 90 * S.ART_RATE
     cutout_usd = 90 * S.ART_RATE
     if engine in S.MODAL_DANCE_SECONDS:
-        return {"dryRun": True, "engine": engine, "keyPresent": bool(SD.read_key()),
-                "costUsdEstimate": round(drawing_usd + S.MODAL_DANCE_SECONDS[engine] * S.MOTION_RATE + cutout_usd, 2),
-                "note": "Runs on our own Modal graphics card; estimate from measured run times. No key needed."}
+        result = {"dryRun": True, "engine": engine, "keyPresent": bool(SD.read_key())}
+        try:
+            route = R.choose_route(args.engine and engine, account_state())
+        except Exception as error:  # noqa: BLE001 - the dry run still prices the request
+            result.update(accountChecked=False,
+                          why=f"Could not look at the Modal account, so the dance model is not confirmed: "
+                              f"{friendly(error)}")
+        else:
+            result.update(accountChecked=True, engine=route["engine"], danceModel=R.NAMES.get(route["engine"]),
+                          why=route["why"], fallback=route["fallback"])
+            if route["whatToDo"]:
+                result["whatToDo"] = route["whatToDo"]
+            engine = route["engine"] or engine
+        result.update(
+            costUsdEstimate=round(drawing_usd + S.MODAL_DANCE_SECONDS[engine] * S.MOTION_RATE + cutout_usd, 2),
+            note="Runs on our own Modal graphics card; estimate from measured run times. No key needed. "
+                 "Only free look-ups in the Modal account were made.")
+        return result
     progress("check", 0.3, "Checking the video service's public price list")
     model = SD.find_model(SD.catalogue(SD.Http()), args.model)
     plan = SD.plan_clip(model, args.resolution)
@@ -408,6 +444,21 @@ def generate(args: argparse.Namespace) -> dict:
     worst = (0 if args.from_still else 240 * S.ART_RATE) + dance_usd + (0 if args.stills_only else 240 * S.ART_RATE)
     if worst > args.max_cost:
         raise Failure(f"This dancer could cost up to ${worst:.2f}, above the allowed ${args.max_cost:.2f} (--max-cost)")
+
+    # Which dance model this Modal account can run (free look-ups, nothing is started).
+    state = account_state()
+    if not args.stills_only and engine != "openrouter":
+        route = R.choose_route(args.engine and engine, state)
+        if route["engine"] is None:
+            raise Failure(" ".join(part for part in (route["why"], route["whatToDo"]) if part))
+        if route["engine"] != engine:
+            engine = route["engine"]
+            worst += 1.5 * S.MODAL_DANCE_SECONDS[engine] * S.MOTION_RATE - dance_usd
+            if worst > args.max_cost:
+                raise Failure(f"{route['why']} This dancer could then cost up to ${worst:.2f}, above the allowed "
+                              f"${args.max_cost:.2f} (--max-cost)")
+        progress("setup", 0.01, route["why"])
+    configure_cloud(state)
     out.mkdir(parents=True, exist_ok=True)
 
     # 1. Character picture (+ expressions), cut out and laid out.
@@ -504,26 +555,58 @@ def generate(args: argparse.Namespace) -> dict:
     return {"done": True, "media": str(media_path), "costUsdEstimate": cost}
 
 
-def prepare() -> dict:
+def prepare(dry: bool = False) -> dict:
     ledger = {"usd": 0.0, "steps": []}
-    progress("setup", 0.05, "Getting the cloud tools ready (first time can take 15 minutes)")
+    state = account_state()
+    plan = R.prepare_plan(state)
+    if dry:
+        route = R.choose_route(None, state)
+        return {"dryRun": True, "prepare": plan, "danceModelNow": R.NAMES.get(route["engine"]), "why": route["why"],
+                "note": "Nothing was downloaded or started; only free look-ups in the Modal account were made."}
+    progress("setup", 0.03, f"Getting the cloud tools ready: {plan['summary']}. "
+                            "Finished parts are kept, so it can simply be run again if it stops.")
+    configure_cloud(state)
+    ltx_note = None
     with cloud() as C:
-        names = {entry.path.strip("/") for entry in C.art_weights.listdir("/")}
-        if "ready.json" not in names:
-            progress("setup", 0.2, "Downloading the drawing tools")
+        if not state["art"]:
+            progress("setup", 0.1, "Downloading the drawing tools (about 34 GB, about 5 minutes)")
             run_remote(C.prepare_art_weights, None, S.PREPARE_RATE, ledger, "download picture models")
-        progress("setup", 0.6, "Checking the drawing tools")
+        progress("setup", 0.2, "Checking the drawing tools")
         art = run_remote(C.selftest_art, None, S.PREPARE_RATE, ledger, "check picture tools")
-        names = {entry.path.strip("/") for entry in C.wan_weights.listdir("/")}
-        if "ready.json" not in names:
-            progress("setup", 0.65, "Downloading the dance model (about 126 GB, takes about 20 minutes)")
-            run_remote(C.prepare_wan_weights, None, S.WAN_PREPARE_RATE, ledger, "download dance model")
+        if R.ltx_where(state) is None:
+            step = _ltx_step(plan)
+            if step.get("needsSignIn"):
+                progress("setup", 0.3, "Checking the LTX-2.5 dance model (no Hugging Face sign-in is stored, so it "
+                                       "can only be finished if its files are already there)")
+            else:
+                progress("setup", 0.3, f"Downloading the LTX-2.5 dance model: about {step['gb']:.0f} GB, about "
+                                       f"{step['minutes']} minutes, about ${step['usd']:.2f}")
+            result = run_remote(C.prepare_ltx_weights, None, S.LTX_PREPARE_RATE, ledger, "get LTX-2.5 dance model")
+            if result.get("status") == "ready":
+                state["ownLtx"] = True
+            else:
+                ltx_note = R.sign_in_steps(state["hfSecret"], result.get("problem", "no-token"))
+                progress("setup", 0.4, "LTX-2.5 was not downloaded. " + ltx_note)
+        if not state["wan"]:
+            progress("setup", 0.5, "Downloading the Wan2.2 dance model (about 126 GB, about 13 minutes)")
+            run_remote(C.prepare_wan_weights, None, S.WAN_PREPARE_RATE, ledger, "download Wan dance model")
+            state["wan"] = True
         progress("setup", 0.8, "Checking the dance tools")
-        motion = {"wan": run_remote(C.selftest_wan, None, S.PREPARE_RATE, ledger, "check Wan dance tools"),
-                  "ltx": run_remote(C.selftest_motion, None, S.PREPARE_RATE, ledger, "check LTX dance tools")}
+        motion = {"wan": run_remote(C.selftest_wan, None, S.PREPARE_RATE, ledger, "check Wan dance tools")}
+        if R.ltx_where(state):
+            motion["ltx"] = run_remote(C.selftest_motion, None, S.PREPARE_RATE, ledger, "check LTX dance tools")
     append_ledger({"time": datetime.now(timezone.utc).isoformat(), "name": "prepare",
                    "usd": round(ledger["usd"], 4), "steps": ledger["steps"]})
-    return {"done": True, "art": art, "motion": motion, "costUsdEstimate": round(ledger["usd"], 2)}
+    route = R.choose_route(None, state)
+    result = {"done": True, "art": art, "motion": motion, "danceModel": R.NAMES.get(route["engine"]),
+              "message": route["why"], "costUsdEstimate": round(ledger["usd"], 2)}
+    if ltx_note:
+        result["whatToDo"] = ltx_note
+    return result
+
+
+def _ltx_step(plan: dict) -> dict:
+    return next(step for step in plan["downloads"] if step["model"].startswith("LTX"))
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -534,14 +617,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--expressions", action="append", help="for example: smiling (repeat or comma-separate)")
     parser.add_argument("--seed", type=int)
     parser.add_argument("--engine", choices=["wan", "ltx", "openrouter", "seedance"],
-                        help=f"dance step; default {S.DEFAULT_ENGINE} (our own Modal route). openrouter needs OPENROUTER_API_KEY")
+                        help=f"dance step; default {S.DEFAULT_ENGINE} (our own Modal route; Wan2.2 if LTX-2.5 is not "
+                             "ready on this account). openrouter needs OPENROUTER_API_KEY")
     parser.add_argument("--model", default=S.SEEDANCE_MODEL,
                         help="OpenRouter catalogue id for --engine openrouter, e.g. minimax/hailuo-3-max")
     parser.add_argument("--hosted-cap", "--seedance-cap", dest="hosted_cap", type=float, default=5.0,
                         help="stop before total OpenRouter spending in the local ledger would pass this many dollars")
     parser.add_argument("--resolution", default="480p",
                         help="OpenRouter size name, checked against the catalogue (480p is already 720 pixels tall after shaping)")
-    parser.add_argument("--dry-run", action="store_true", help="check the request and print the cost; spend nothing")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="check the request, say which dance model this Modal account would use and why, "
+                             "and print the cost; spend nothing (with --prepare: what it would download)")
     parser.add_argument("--stills-only", action="store_true", help="make the pictures only, no dance")
     parser.add_argument("--from-still", action="store_true", help="dance the existing keyframe.png in --out")
     parser.add_argument("--like", help="re-dress the character from this other sequence folder (same person and pose)")
@@ -562,7 +648,7 @@ def main(argv: list[str] | None = None) -> int:
     os.environ.setdefault("PYTHONUTF8", "1")
     try:
         if args.prepare:
-            emit(**prepare())
+            emit(**prepare(dry=args.dry_run))
             return 0
         if args.stills_only and args.from_still:
             raise Failure("Choose either --stills-only or --from-still, not both.")

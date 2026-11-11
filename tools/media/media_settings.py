@@ -9,7 +9,19 @@ APP_NAME = "beta-sequence-media"
 ART_WEIGHTS_VOLUME = "beta-sequence-art-weights"   # ours: picture + cut-out models
 WAN_WEIGHTS_VOLUME = "beta-sequence-wan-weights"   # ours: Wan2.2 image-to-video
 # Another project's verified LTX-2.5 cache. Mounted READ-ONLY, never written.
+# It only exists on the owner's Modal account; when it is there it is used as before.
 LTX_CACHE_VOLUME = "morriton-ltx-2-5-model-cache"
+# Ours: LTX-2.5 downloaded by --prepare on any other Modal account.
+LTX_WEIGHTS_VOLUME = "beta-sequence-ltx-weights"
+# Modal secret holding a Hugging Face read token (key HF_TOKEN), needed because LTX-2.5 asks
+# people to accept its licence on Hugging Face first. Another secret name can be given in the
+# MEDIA_HF_SECRET environment variable. The token itself is never read or printed by this tool.
+HF_SECRET_NAME = "beta-sequence-huggingface"
+
+# Environment variables (all optional).
+ENV_HF_SECRET = "MEDIA_HF_SECRET"                     # name of the Modal secret with HF_TOKEN
+ENV_IGNORE_LTX_CACHE = "MEDIA_IGNORE_LTX_CACHE"       # for testing: "1" = act as if the owner's cache was missing
+ENV_LTX_VOLUME = "MEDIA_LTX_VOLUME"                   # for testing: another name for our own LTX volume
 
 # --- Picture model: Z-Image-Turbo (Apache-2.0, ungated) ----------------------
 ZIMAGE_REPO = "Tongyi-MAI/Z-Image-Turbo"
@@ -43,6 +55,8 @@ LTX_CODE_REVISION = "a95ab856bf29407b6b066ede0abe1846050db56c"
 LTX_REPO = "Lightricks/LTX-2.5"
 LTX_REVISION = "5e6e71018ee1756ed329b697a7b4aedc934dfce9"
 LTX_LICENSE = "ltx-2.x-community-license (free below USD 10M yearly revenue and for non-commercial hobby use)"
+LTX_GATED = True        # Hugging Face asks for a sign-in and a click on "accept" (checked 2026-11-11: gated "auto")
+LTX_PAGE = f"https://huggingface.co/{LTX_REPO}"
 LTX_FILES = {
     "transformer": ("diffusion_models/ltx-2.5-22b-dev-transformer-bf16.safetensors", 42018190584,
                     "792a2bad501ca03262c0bc2ce7a2949e85b142ce18e30894aad5bc849c8e7584"),
@@ -121,6 +135,9 @@ MOTION_TIMEOUT = 900
 PREPARE_CPU = 2
 PREPARE_MEMORY_MIB = 8192
 PREPARE_TIMEOUT = 2400
+DOWNLOAD_CPU = 4                               # the big downloads (Wan2.2, LTX-2.5)
+DOWNLOAD_MEMORY_MIB = 16384
+DOWNLOAD_TIMEOUT = 3600
 
 # --- Published prices (https://modal.com/pricing, checked 2026-11-10) ---------
 PRICES_CHECKED = "2026-11-10"
@@ -138,7 +155,21 @@ def rate_per_second(gpu: str | None, cpu: float, memory_mib: int) -> float:
 ART_RATE = rate_per_second(ART_GPU, ART_CPU, ART_MEMORY_MIB)
 MOTION_RATE = rate_per_second(MOTION_GPU, MOTION_CPU, MOTION_MEMORY_MIB)
 PREPARE_RATE = rate_per_second(None, PREPARE_CPU, PREPARE_MEMORY_MIB)
-WAN_PREPARE_RATE = rate_per_second(None, 4, 16384)
+WAN_PREPARE_RATE = rate_per_second(None, DOWNLOAD_CPU, DOWNLOAD_MEMORY_MIB)
+LTX_PREPARE_RATE = WAN_PREPARE_RATE
+
+# One-time downloads: size in GB and seconds (download + checksum check).
+# Pictures and Wan were measured on 2026-11-11. LTX is an estimate scaled from the Wan download
+# (same machine, same method); it could not be measured because the owner's account already had it.
+PREPARE_GB = {
+    "art": round((sum(size for size, _ in ZIMAGE_FILES.values())
+                  + sum(size for size, _ in BIREFNET_FILES.values())) / 1e9, 1),
+    "ltx": round(sum(size for _, size, _ in LTX_FILES.values()) / 1e9, 1),
+    "wan": 126.0,
+}
+PREPARE_SECONDS = {"art": 282, "ltx": 600, "wan": 754}
+PREPARE_RATES = {"art": PREPARE_RATE, "ltx": LTX_PREPARE_RATE, "wan": WAN_PREPARE_RATE}
+SOFTWARE_BUILD_USD = 0.10      # building the cloud software the first time (estimate)
 
 # Dance engines that run on our own Modal account (no other account or key needed),
 # with typical seconds of H200 time per clip including start-up and model loading.

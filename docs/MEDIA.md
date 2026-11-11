@@ -9,7 +9,7 @@ cast is already in the repository, so nobody needs any account or key to enjoy t
 | | Self-hosted on Modal (default) | MiniMax through OpenRouter | Seedance through OpenRouter |
 |---|---|---|---|
 | What it is | Open video model on our own rented cloud graphics card: **LTX-2.5** (default) or **Wan2.2** | `minimax/hailuo-3-max`, a hosted model, paid per clip | `bytedance/seedance-2.5`, a hosted model, paid per clip |
-| What you need | A Modal account (`modal setup`) | Modal account + an OpenRouter key | Modal account + an OpenRouter key |
+| What you need | A Modal account (`modal setup`); for LTX-2.5 also a free Hugging Face sign-in (without it, Wan2.2 is used) | Modal account + an OpenRouter key | Modal account + an OpenRouter key |
 | Cost per new dancer | **about $0.35** with LTX, about $0.80 with Wan (measured) | about **$0.31** at 480p, $0.46 at 768p (computed) | about **$0.59** at 480p, $1.23 at 720p (computed) |
 | Time per new dancer | about 6 minutes with LTX, 10 with Wan | not measured | not measured |
 | Tried for real | Yes | No paid test: the request is checked against the live catalogue only | No paid test: the request is checked against the live catalogue only |
@@ -104,16 +104,71 @@ ungated). They were checked and deliberately **not** downloaded or used:
 | Dance (option) | [`Wan-AI/Wan2.2-I2V-A14B-Diffusers`](https://huggingface.co/Wan-AI/Wan2.2-I2V-A14B-Diffusers) | `596658fd9ca6b7b71d5057529bbf319ecbc61d74` | Apache-2.0 |
 
 All weights come from the publisher's or author's own account. Every large file is checked against its published
-SHA-256 checksum when it is downloaded (Wan's 30 files are listed in `tools/media/wan_files.json`). LTX's six files
-(74.5 GiB) are read **read-only** from a verified cache volume of another project of the same account
-(`morriton-ltx-2-5-model-cache`), so they did not have to be downloaded again; the code checks their sizes and the
-cache's checksum record against the pins. `media.json` records each model, revision and licence in
-`provenance.models`, the hosted model (if one was used) by its dated catalogue name, and marks the media as
+SHA-256 checksum when it is downloaded (Wan's 30 files are listed in `tools/media/wan_files.json`, LTX's six in
+`LTX_FILES` in `tools/media/media_settings.py`). On the owner's Modal account, LTX's six files (74.5 GiB) are read
+**read-only** from a verified cache volume of another of his projects (`morriton-ltx-2-5-model-cache`), so they are
+not downloaded twice; the code checks the cache's checksum record against the pins. On any other Modal account,
+`--prepare` downloads the same six files into this project's own volume `beta-sequence-ltx-weights` and checks
+each checksum (see "First time on your own Modal account"). `media.json` records each model, revision and licence
+in `provenance.models`, the hosted model (if one was used) by its dated catalogue name, and marks the media as
 machine-made.
 
-Cloud storage used: `beta-sequence-art-weights` (picture and cut-out models, 34 GB) and `beta-sequence-wan-weights`
-(Wan2.2, 126 GB). Both can be deleted with `modal volume delete <name>` if no longer wanted; they are downloaded
-again automatically when needed.
+## Which dance model a run uses
+
+The default route picks, in this order, and says which and why at the start of every run:
+
+1. **LTX-2.5 from the owner's cache**, if this Modal account has it (only the owner's does). Used read-only.
+2. **LTX-2.5 from this account's own copy** (`beta-sequence-ltx-weights`), once `--prepare` has downloaded it.
+3. **Wan2.2**, if it is prepared but LTX-2.5 is not. The run says so in plain words, including what to do to get
+   LTX-2.5 (usually: the Hugging Face sign-in below). Wan2.2 is slower and costs about $0.80 instead of $0.35.
+4. **Nothing ready:** the run stops before spending anything and says to run `python tools/media/generate.py
+   --prepare` first, with its size, time and cost.
+
+`--engine ltx` or `--engine wan` asks for one model by name; `--engine ltx` then never switches to Wan. Asking for
+Wan when it is not downloaded yet downloads it first, as before. `--dry-run` shows the choice for this account
+without spending anything (it only reads a few small records in the Modal account).
+
+For testing only: `MEDIA_IGNORE_LTX_CACHE=1` makes the tool act as if the owner's cache was not there, and
+`MEDIA_LTX_VOLUME=<name>` uses another name for the project's own LTX volume. Together they let the owner try the
+stranger's path on his own account without touching his cache.
+
+## Cloud storage and what it costs
+
+| Volume | What is in it | Size (measured) |
+|---|---|---|
+| `beta-sequence-art-weights` | picture and cut-out models | 31.4 GiB |
+| `beta-sequence-wan-weights` | Wan2.2 | 117.5 GiB |
+| `beta-sequence-ltx-weights` | LTX-2.5, only on accounts without the owner's cache | 74.5 GiB (the six pinned files) |
+
+**Price** ([modal.com/pricing](https://modal.com/pricing), read 2026-11-11): stored files cost $0.09 per GiB per month,
+and the **first 1 TiB per month is free** for the whole Modal workspace. So these volumes cost **nothing** while the
+workspace stays under 1 TiB in total. Above that, the owner's two volumes would cost about **$13.40 a month**
+together; with LTX-2.5 as well (about 223 GiB in all) about **$20.10 a month**.
+
+**Between dancers nothing else costs money.** No machine keeps running: every cloud machine is started for one
+step and stopped right after it. The only standing cost is the storage above.
+
+**Deleting the stored files** (for example to stay under the free 1 TiB):
+
+```powershell
+modal volume delete beta-sequence-wan-weights      # Wan2.2
+modal volume delete beta-sequence-art-weights      # picture and cut-out models
+modal volume delete beta-sequence-ltx-weights      # LTX-2.5 (only if you prepared your own)
+```
+
+Never delete `morriton-ltx-2-5-model-cache`: it belongs to another project. The drawback of deleting is the
+download next time:
+
+- Picture models: the next new dancer downloads them again by itself, about 5 minutes (282 s measured) and
+  about $0.01, before drawing.
+- Wan2.2: downloaded again by `--prepare` or by a run with `--engine wan`, about 13 minutes (754 s measured) and
+  about $0.07. On the owner's account the default route does not need it (it uses LTX-2.5 from the cache).
+- LTX-2.5 (own copy): downloaded again by `--prepare`, about 80 GB, estimated 10 minutes and $0.05; it needs the
+  Hugging Face sign-in. Until then the default route uses Wan2.2 if that is there.
+
+**What a new dancer costs each time:** about $0.35 with LTX-2.5 (about 6 minutes) or about $0.80 with Wan2.2
+(about 10 minutes), pictures and cut-out included; about $0.28 with LTX-2.5 when only the dance is made from an
+existing picture (`--from-still`, measured). Run times and prices are in "Cost details" below.
 
 ## Setup (once)
 
@@ -126,9 +181,39 @@ $env:PYTHONUTF8 = "1"
 python tools/media/generate.py --prepare
 ```
 
-`--prepare` builds the cloud software, downloads the picture, cut-out and Wan models (about 160 GB in total,
-checksums verified, about 20 minutes, about $0.10), and checks every toolset without using a graphics card.
-Finished steps are skipped when it is run again.
+`--prepare` builds the cloud software, downloads whatever this Modal account does not have yet (picture and
+cut-out models, LTX-2.5, Wan2.2; checksums verified) and checks every toolset without using a graphics card. It
+first prints how much it will download, how long that takes and what it costs. Finished steps are skipped when it
+is run again. `python tools/media/generate.py --prepare --dry-run` prints that plan and spends nothing.
+
+## First time on your own Modal account
+
+Anyone can make new dancers with their own Modal account; nothing of the owner's is needed.
+
+1. Install the tools above and sign in to Modal once: `modal setup`.
+2. For LTX-2.5 (the better and cheaper dance model), give the cloud a Hugging Face sign-in once. LTX-2.5's
+   publisher asks every downloader to accept its licence (free for people and companies under USD 10 million
+   yearly revenue):
+   - sign in at [huggingface.co](https://huggingface.co) (a free account is enough),
+   - open [huggingface.co/Lightricks/LTX-2.5](https://huggingface.co/Lightricks/LTX-2.5) and accept the licence,
+   - make a token with read access at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens),
+   - store it in Modal (this is Modal's usual way of keeping such tokens):
+     `modal secret create beta-sequence-huggingface HF_TOKEN=<your token>`.
+     To use a secret you already have under another name, set `MEDIA_HF_SECRET=<that name>`.
+   The token stays in your Modal account. The tool only checks that the secret exists; it never reads, prints or
+   stores the token. You can skip this step: then Wan2.2 is used instead, and `--prepare` explains what to do.
+3. Run `python tools/media/generate.py --prepare` once:
+
+   | | Size | Time | Cloud cost |
+   |---|---|---|---|
+   | Picture and cut-out models | 34 GB | about 5 minutes (measured) | about $0.01 |
+   | LTX-2.5 | 80 GB | about 10 minutes (estimate; the checksum part measured 4 minutes) | about $0.05 |
+   | Wan2.2 | 126 GB | about 13 minutes (measured) | about $0.07 |
+   | Building the cloud software, checks | | about 10 minutes | about $0.12 |
+   | **Total** | **240 GB** | **about 40 minutes** | **about $0.25** |
+
+   The files then sit in your own Modal storage, free under 1 TiB (see "Cloud storage and what it costs").
+4. Make dancers as below. Each new dancer costs about $0.35 with LTX-2.5, about $0.80 with Wan2.2.
 
 ## Making a dancer
 
@@ -141,12 +226,13 @@ python tools/media/generate.py --name "Tayne" `
 - `--prompt` describes the person and the dance in plain words: what they look like, then "Dance: ...".
 - `--expressions` can be repeated or comma-separated. Each one becomes `<name>.png`.
 - `--seed` makes a result repeatable. Without it, the seed comes from the name.
-- `--engine ltx` (default), `wan` or `openrouter` (`seedance` also works). With `openrouter`, `--model` picks any
+- `--engine ltx` (default; see "Which dance model a run uses"), `wan` or `openrouter` (`seedance` also works).
+  With `openrouter`, `--model` picks any
   model in OpenRouter's video catalogue that accepts a first and a last frame (default `bytedance/seedance-2.5`;
   `minimax/hailuo-3-max` is the other one checked) and `--resolution` picks its size (default `480p`, which is
   already 720 pixels tall after shaping).
-- `--dry-run` checks the request (for OpenRouter against the live public catalogue) and prints the expected cost.
-  It spends nothing and needs no key.
+- `--dry-run` checks the request (for OpenRouter against the live public catalogue), says which dance model this
+  Modal account would use and why, and prints the expected cost. It spends nothing and needs no key.
 - `--stills-only` makes only the pictures; `--from-still` dances the existing `keyframe.png` in `--out`.
 - `--like <folder>` (with `--like-strength`, `--like-tint`) re-dresses another sequence's character.
 - `--max-cost` (default $1.50) refuses to start if one dancer could cost more; `--hosted-cap` (default $5) refuses
@@ -198,7 +284,8 @@ of the resources requested:
 | Dance, LTX-2.5 | H200, 4 cores, 128 GiB | $0.001598 | 166 to 174 s, $0.27 to $0.28 |
 | Dance, Wan2.2 | H200, 4 cores, 128 GiB | $0.001598 | 448 to 460 s, $0.72 to $0.74 |
 | Cut out every frame | L40S, 4 cores, 32 GiB | $0.000665 | 46 to 60 s, $0.03 to $0.04 |
-| Downloads and checks | 2 to 4 cores, no graphics card | $0.00004 to $0.00009 | |
+| Downloads and checks | 2 to 4 cores, no graphics card | $0.00004 to $0.00009 | see "First time on your own Modal account" |
+| Stored model files | Modal volumes | $0.09 per GiB per month above the free 1 TiB | $0 for this project's 149 to 223 GiB |
 
 **OpenRouter** (live public catalogue `GET https://openrouter.ai/api/v1/videos/models`, read 2026-11-11; the tool
 reads it again before every clip):
@@ -265,6 +352,27 @@ $0.10).
 
 The local record of every measured step is `.local/media-ledger.jsonl` while working; it is not committed.
 
+### New dancers on any Modal account (2026-11-11, cap $2): about $0.35
+
+The stranger's path was tried on the owner's account with the testing switches (`MEDIA_IGNORE_LTX_CACHE=1`,
+`MEDIA_LTX_VOLUME=beta-sequence-ltx-weights-temp-test`). No Hugging Face token was available for this work and
+none was looked for, so the real 80 GB download from Hugging Face was **not** tried. Instead the six files were
+copied from the owner's cache into the temporary volume, and the project's own `--prepare` then checked every
+checksum and made the volume ready, exactly as after a download. The temporary volume was deleted afterwards.
+
+| What | Steps | Cost |
+|---|---|---|
+| `--prepare` as a stranger, no sign-in | real check against Hugging Face from the cloud said "sign-in needed" (3.8 s); tool checks | $0.003 |
+| Copy of the six LTX files into the temporary volume | testing aid only, 301 s on 4 cores | $0.026 |
+| `--prepare` again | checksums of all six files (218 s), tool checks | $0.023 |
+| One default-route Tayne clip from the temporary volume | dance 157 s ($0.250), cut-out 47 s ($0.031) | $0.282 |
+| `--prepare` as the owner | still uses his cache read-only, creates no new volume; tool checks only | $0.003 |
+| Small software image for the copy step | | under $0.01 (estimate) |
+| **Total** | | **about $0.35** |
+
+The clip (Tayne's own picture, prompt and seed 9002, grey backdrop) was a clear strut with the hat staying on, a
+natural face and clean see-through edges, like the shipped one. It was not kept in the repository.
+
 ## Tests
 
 ```powershell
@@ -273,7 +381,9 @@ python -m unittest discover -s test/media -v
 
 The tests need no cloud, no graphics card and no key. They check the `media.json` contract, the cut-out clean-up
 (backdrop tint, green halos, blurred hands), the loop step, the hat line, a real ffmpeg round trip that proves the
-see-through background survives VP9 encoding, and the OpenRouter route against a fake local server: request shape
+see-through background survives VP9 encoding, the choice of dance model per account (owner's cache, own copy,
+only Wan, nothing prepared, Hugging Face sign-in needed, the testing switch), the LTX download's checksum step on
+tiny stand-in files, and the OpenRouter route against a fake local server: request shape
 (same picture first and last, no audio), polling, download (the key is not sent to the storage server), refused
 and failed jobs (never re-sent), the time limit, the spending cap, and prices per token, per second and in cents.
 
@@ -285,8 +395,9 @@ and failed jobs (never re-sent), the time limit, the spending cap, and prices pe
 | `tools/media/make_cast.py` | Makes the whole demo cast from `cast.json`, cost first. |
 | `tools/media/cast.json` | The demo cast: names, descriptions, seeds. |
 | `tools/media/media_cloud.py` | The Modal app: software images, storage and the cloud steps. |
+| `tools/media/media_route.py` | Looks at the Modal account and picks the dance model; the `--prepare` plan. |
 | `tools/media/media_art.py` | Runs in the cloud: drawing (Z-Image-Turbo) and cut-out (BiRefNet). |
-| `tools/media/media_ltx.py` | Runs in the cloud: the LTX-2.5 dance. |
+| `tools/media/media_ltx.py` | Runs in the cloud: the LTX-2.5 download and check, and the LTX-2.5 dance. |
 | `tools/media/media_wan.py`, `wan_files.json` | Runs in the cloud: the Wan2.2 dance, and its pinned file list. |
 | `tools/media/media_hosted.py` | The OpenRouter route: catalogue check, price, one request, polling, download. |
 | `tools/media/media_finish.py` | Runs locally: cut-out clean-up, layout, loop, VP9 encode, hat line. |

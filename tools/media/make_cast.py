@@ -43,7 +43,7 @@ def plan(engine: str, resolution: str, stills: bool, model_id: str = S.SEEDANCE_
         model = SD.find_model(SD.catalogue(SD.Http()), model_id)      # public price list, no key sent
         each = float(SD.plan_clip(model, resolution)["usd"]) + 90 * S.ART_RATE
     else:
-        each = S.MODAL_DANCE_SECONDS[engine] * S.MOTION_RATE + 90 * S.ART_RATE
+        each = S.MODAL_DANCE_SECONDS[engine or S.DEFAULT_ENGINE] * S.MOTION_RATE + 90 * S.ART_RATE
     steps = []
     for entry in cast:
         folder = root / Path(entry["id"])
@@ -66,7 +66,9 @@ def command(entry: dict, folder: Path, engine: str, resolution: str, stills: boo
             if entry.get("likeTint"):
                 args += ["--like-tint", entry["likeTint"]]
         return args + ["--stills-only"]
-    args += ["--from-still", "--engine", engine]
+    args += ["--from-still"]
+    if engine:                       # no --engine: generate.py picks the default route for this account
+        args += ["--engine", engine]
     if engine in ("openrouter", "seedance"):
         args += ["--model", model_id, "--resolution", resolution]
     return args
@@ -74,7 +76,9 @@ def command(entry: dict, folder: Path, engine: str, resolution: str, stills: boo
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--engine", choices=["wan", "ltx", "openrouter", "seedance"], default=S.DEFAULT_ENGINE)
+    parser.add_argument("--engine", choices=["wan", "ltx", "openrouter", "seedance"],
+                        help="dance model; by default the same choice as generate.py (LTX-2.5, or Wan2.2 if "
+                             "LTX-2.5 is not ready on this Modal account)")
     parser.add_argument("--model", default=S.SEEDANCE_MODEL, help="OpenRouter catalogue id for --engine openrouter")
     parser.add_argument("--resolution", default="480p", help="OpenRouter size name, checked against the catalogue")
     parser.add_argument("--only", help="comma-separated sequence ids to do, e.g. tayne/nude,oyster")
@@ -92,7 +96,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     total = round(sum(step["costUsdEstimate"] for step in steps), 2)
     hosted = args.engine in ("openrouter", "seedance")
-    what = "still pictures" if args.stills else f"{args.engine} dance loops" + (
+    what = "still pictures" if args.stills else f"{args.engine or 'default-route'} dance loops" + (
         f" with {args.model} at {args.resolution}" if hosted else "")
     emit(plan=what, sequences=steps, totalUsdEstimate=total)
     missing = [step["id"] for step in steps if not step["ready"]]
