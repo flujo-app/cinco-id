@@ -3,7 +3,7 @@
   "defaultProject": "4d3d3d3",
   "maxWindows": 96,
   "voice": {
-    "tts": { "engine": "voder", "python": "python", "voderPath": "C:/path/to/voder", "pitch": 104, "rate": 1.02 },
+    "tts": { "engine": "voder", "python": "python", "voderPath": "C:/path/to/voder", "pitch": 104, "rate": 1.02, "voice": null, "windowsRate": 0 },
     "stt": {
       "engine": "whisper",
       "python": "C:/path/to/venv/Scripts/python.exe",

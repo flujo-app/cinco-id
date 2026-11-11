@@ -38,6 +38,9 @@ export const DEFAULT_PHRASES = {
   generatorMissing: 'The sequence generator is not connected.',
   generatorFailed: 'The new sequence did not work out, {operator}.',
   message: 'Message from {caller}.',
+  noVoice: 'There is no voice called {name} on this computer.',
+  noVoices: 'I have only this voice, {operator}.',
+  voiceChanged: 'This is my voice now, {operator}.',
 };
 
 const PENDING_MS = 90_000;
@@ -62,8 +65,10 @@ function daypart(date) {
  * It never draws anything itself. It emits "action" events that the screen carries out.
  */
 export class Computer extends EventEmitter {
-  constructor({ library, config = {}, stateFile = null, brain = null, generator = null, connectors = null, now = () => Date.now() }) {
+  constructor({ library, config = {}, stateFile = null, brain = null, generator = null, connectors = null, voices = null, now = () => Date.now() }) {
     super();
+    this.voices = voices; // lists and switches the computer's voice
+    this.voiceChoice = null;
     this.library = library;
     this.config = config;
     this.stateFile = stateFile;
@@ -96,13 +101,14 @@ export class Computer extends EventEmitter {
       const saved = JSON.parse(await fs.readFile(this.stateFile, 'utf8'));
       this.revealed = new Set(saved.revealed ?? []);
       this.learned = saved.learned ?? {};
+      if (saved.voice && this.voices) this.voiceChoice = await this.voices.use(saved.voice.name).catch(() => null);
     } catch { /* first run */ }
   }
 
   async persist() {
     if (!this.stateFile) return;
     await fs.mkdir(path.dirname(this.stateFile), { recursive: true });
-    await fs.writeFile(this.stateFile, JSON.stringify({ revealed: [...this.revealed], learned: this.learned }, null, 2));
+    await fs.writeFile(this.stateFile, JSON.stringify({ revealed: [...this.revealed], learned: this.learned, voice: this.voiceChoice }, null, 2));
   }
 
   // ---------- talking to the screen ----------
@@ -248,6 +254,8 @@ export class Computer extends EventEmitter {
       case 'list': return this.list(command.what);
       case 'mute': return this.send({ type: 'quiet' });
       case 'music': this.send({ type: 'music', on: command.on }); return this.say('ok');
+      case 'voice.list': return this.listVoices();
+      case 'voice.use': return this.useVoice(command.name);
       case 'generate': return this.generate(command.prompt);
       case 'project.create': return this.createProject(command.name);
       case 'call.test': return this.incomingCall({
@@ -582,6 +590,27 @@ export class Computer extends EventEmitter {
     const projects = this.library.projects.size;
     const sequences = this.library.allSequences().length;
     return this.say(`${projects} ${projects === 1 ? 'project' : 'projects'}, ${sequences} ${sequences === 1 ? 'sequence' : 'sequences'}.`);
+  }
+
+  // ---------- the computer's own voice ----------
+
+  async listVoices() {
+    const voices = (await this.voices?.list()) ?? [];
+    if (!voices.length) return this.say('noVoices');
+    const current = this.voiceChoice?.name;
+    const lines = voices.map(voice => `${voice.name === current ? '>' : ' '} ${voice.name}${voice.language ? `  (${voice.language})` : ''}`);
+    lines.push('', 'Say "use the voice ..." to switch. Any voice installed in Windows shows up here.');
+    this.openWindow({ kind: 'note', title: 'Voices', text: lines.join('\n') });
+    return this.say(`${voices.length} ${voices.length === 1 ? 'voice' : 'voices'}.`);
+  }
+
+  async useVoice(name) {
+    const chosen = await this.voices?.use(name);
+    if (!chosen) return this.say('noVoice', { name: titleCase(name) });
+    this.voiceChoice = chosen;
+    this.persist().catch(() => {});
+    this.send({ type: 'quiet' });
+    return this.say('voiceChanged');
   }
 
   // ---------- new projects and new sequences ----------

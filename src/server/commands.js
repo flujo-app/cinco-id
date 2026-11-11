@@ -73,6 +73,15 @@ export function parseCommand(text, world) {
 
   // Quiet, clearing up
   if (/^(?:quiet|be quiet|shut up|silence|mute|stop talking)$/.test(said)) return { intent: 'mute' };
+  // Which voice the computer speaks with
+  const plain = said.replace(ASK, '');
+  if (/^(?:list|show|show me|what|which)(?: are| is)? (?:the |your |all |all the )?voices?(?: do you have| are there| can you do| have you got)?$/.test(plain)) return { intent: 'voice.list' };
+  if (/voice/.test(plain) && (m = plain.match(/^(?:use|switch to|change to|take) (?:the |a )?(?:voice (?:of |called |named )?)?(.+?)(?: as (?:your |the |my )?voice| voice)?$/))) {
+    return { intent: 'voice.use', name: m[1] };
+  }
+  if ((m = plain.match(/^(?:change|switch|set) (?:your |the )?voice to (?:the )?(.+?)(?: voice)?$/))) return { intent: 'voice.use', name: m[1] };
+  if ((m = plain.match(/^(?:talk|speak|sound) like (?:the |a )?(.+)$/))) return { intent: 'voice.use', name: m[1] };
+
   if (/^(?:(?:stop|kill|cut|no|turn off) (?:the )?music|music off)$/.test(said)) return { intent: 'music', on: false };
   if (/^(?:(?:play|start|put on|turn on|some|give me some|hit the) (?:the |some )?music|music|music on)$/.test(said)) return { intent: 'music', on: true };
   if (/^(?:clear|clear (?:the )?(?:desktop|screen)|shut it down|shut down|close everything|close all|close all windows|stop everything|kill everything|reset|clean up)$/.test(said)) {
