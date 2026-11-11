@@ -10,7 +10,7 @@
   },
   "hatLine": 0.29,
   "provenance": {
-    "created": "2026-11-11T07:10:45Z",
+    "created": "2026-11-11T14:56:58Z",
     "models": [
       {
         "repo": "Tongyi-MAI/Z-Image-Turbo",
@@ -33,25 +33,25 @@
       }
     ],
     "prompts": {
-      "image": "Oyster: a cheerful person in their late twenties wearing a shiny pearl-grey satin shirt, dark slacks, black shoes and a pearl necklace. Dance: a smooth, happy groove, swaying the hips and shoulders and snapping the fingers. Full-body shot of the whole person from the very top of the head (or hat) down to the shoes, standing upright and facing the camera in a relaxed ready-to-dance pose with the arms a little away from the body, centred with empty space all around, nothing cropped. Plain seamless solid light grey studio backdrop with nothing else in the picture: no props, no text, no logo. Realistic video footage of a real-looking, ordinary, invented person who is not any celebrity or real individual. Early-1990s public-access TV or corporate training tape look: slightly soft analogue video picture, warm colours, bright even studio lighting.",
-      "expression:smiling": "Oyster: a cheerful person in their late twenties wearing a shiny pearl-grey satin shirt, dark slacks, black shoes and a pearl necklace. Dance: a smooth, happy groove, swaying the hips and shoulders and snapping the fingers. Full-body shot of the whole person from the very top of the head (or hat) down to the shoes, standing upright and facing the camera in a relaxed ready-to-dance pose with the arms a little away from the body, centred with empty space all around, nothing cropped. Plain seamless solid light grey studio backdrop with nothing else in the picture: no props, no text, no logo. Realistic video footage of a real-looking, ordinary, invented person who is not any celebrity or real individual. Early-1990s public-access TV or corporate training tape look: slightly soft analogue video picture, warm colours, bright even studio lighting. The person is clearly smiling with a big, warm, happy smile.",
-      "motion": "Oyster: a cheerful person in their late twenties wearing a shiny pearl-grey satin shirt, dark slacks, black shoes and a pearl necklace. Dance: a smooth, happy groove, swaying the hips and shoulders and snapping the fingers. The person dances on the spot in the middle of the frame and finishes the dance back in exactly the pose they started in. The whole body stays in view from head to feet the entire time. Static locked-off camera with no zoom, no pan and no cuts. The background is a plain flat grey studio backdrop that stays perfectly even and still. Realistic early-1990s public-access TV video look. Smooth, rhythmic, slightly goofy dancing. No talking, no text.",
+      "image": "Oyster: a slim, clean-shaven man around forty with short dark-brown hair, wearing a snug red knit skull cap whose top is dark navy blue with a red flame pattern, an open red zip-up track jacket with white stripes down the sleeves over a plain black T-shirt, a black studded choker necklace, black trousers and black shoes. Dance: goofy bent-forward bouncing and head-banging, then popping back up straight. Full-body shot of the whole person from the very top of the head (or hat) down to the shoes, standing upright and facing the camera in a relaxed ready-to-dance pose with the arms a little away from the body, centred with empty space all around, nothing cropped. Plain seamless solid light grey studio backdrop with nothing else in the picture: no props, no text, no logo. Realistic video footage of a real-looking, ordinary, invented person who is not any celebrity or real individual. Early-1990s public-access TV or corporate training tape look: slightly soft analogue video picture, warm colours, bright even studio lighting.",
+      "expression:smiling": "Oyster: a slim, clean-shaven man around forty with short dark-brown hair, wearing a snug red knit skull cap whose top is dark navy blue with a red flame pattern, an open red zip-up track jacket with white stripes down the sleeves over a plain black T-shirt, a black studded choker necklace, black trousers and black shoes. Dance: goofy bent-forward bouncing and head-banging, then popping back up straight. Full-body shot of the whole person from the very top of the head (or hat) down to the shoes, standing upright and facing the camera in a relaxed ready-to-dance pose with the arms a little away from the body, centred with empty space all around, nothing cropped. Plain seamless solid light grey studio backdrop with nothing else in the picture: no props, no text, no logo. Realistic video footage of a real-looking, ordinary, invented person who is not any celebrity or real individual. Early-1990s public-access TV or corporate training tape look: slightly soft analogue video picture, warm colours, bright even studio lighting. The person is clearly smiling with a big, warm, happy smile.",
+      "motion": "Oyster: a slim, clean-shaven man around forty with short dark-brown hair, wearing a snug red knit skull cap whose top is dark navy blue with a red flame pattern, an open red zip-up track jacket with white stripes down the sleeves over a plain black T-shirt, a black studded choker necklace, black trousers and black shoes. Dance: goofy bent-forward bouncing and head-banging, then popping back up straight. The person dances on the spot in the middle of the frame and finishes the dance back in exactly the pose they started in. The whole body stays in view from head to feet the entire time. Static locked-off camera with no zoom, no pan and no cuts. The background is a plain flat grey studio backdrop that stays perfectly even and still. Realistic early-1990s public-access TV video look. Smooth, rhythmic, slightly goofy dancing. No talking, no text.",
       "negative": "camera movement, zoom in, zoom out, pan, tilt, cut, scene change, second person, crowd, text, subtitles, watermark, logo, cropped feet, cropped head, leaving the frame, blurry, distorted body, extra limbs, melting, morphing, flicker, talking"
     },
-    "costUsdEstimate": 0.31,
+    "costUsdEstimate": 0.35,
     "engine": "ltx",
     "seed": 2208,
     "backdropForCutout": "grey",
-    "seconds": 6,
+    "seconds": 268,
     "loop": {
-      "typicalStep": 0.01464,
-      "seamBefore": 0.02263,
+      "typicalStep": 0.00498,
+      "seamBefore": 0.00246,
       "crossfadeFrames": 0,
-      "seamAfter": 0.02263,
+      "seamAfter": 0.00246,
       "frames": 96
     },
-    "clipBytes": 811994,
+    "clipBytes": 560336,
     "machineGenerated": true,
-    "note": "Clip cost: picture 0.03 + dance 0.25 + cut-out 0.03 US dollars. Danced on a grey backdrop (chosen by hand) after a blue-backdrop take showed coloured reflections on the satin. No hat: hatLine set by hand to just below the chin as measured on the still and clip frames (the automatic estimate fell at the shoulders)."
+    "note": "Clip cost: picture 0.03 + dance 0.31 + cut-out 0.04 US dollars (measured). No hat brim: hatLine set by hand to just below the chin as measured on the still and clip frames (the automatic estimate, 0.455, fell at the chest because of the bent-forward moves)."
   }
 }
