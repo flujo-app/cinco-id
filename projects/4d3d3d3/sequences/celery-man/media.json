@@ -1,0 +1,55 @@
+{
+  "clip": "loop.webm",
+  "width": 480,
+  "height": 720,
+  "fps": 24,
+  "frames": 96,
+  "stills": {
+    "default": "still.png",
+    "smiling": "smiling.png"
+  },
+  "hatLine": 0.313,
+  "provenance": {
+    "created": "2026-11-11T05:03:05Z",
+    "models": [
+      {
+        "repo": "Tongyi-MAI/Z-Image-Turbo",
+        "revision": "f332072aa78be7aecdf3ee76d5c247082da564a6",
+        "license": "apache-2.0",
+        "role": "character picture"
+      },
+      {
+        "repo": "Lightricks/LTX-2.5",
+        "revision": "5e6e71018ee1756ed329b697a7b4aedc934dfce9",
+        "license": "ltx-2.x-community-license (free below USD 10M yearly revenue and for non-commercial hobby use)",
+        "role": "dance motion",
+        "code": "https://github.com/Lightricks/LTX-2.git@a95ab856bf29407b6b066ede0abe1846050db56c"
+      },
+      {
+        "repo": "ZhengPeng7/BiRefNet-matting",
+        "revision": "eccde0a8cbdce7ac5fecfeb06340fe7b949e85d9",
+        "license": "mit",
+        "role": "background removal"
+      }
+    ],
+    "prompts": {
+      "image": "Celery Man: a tall lanky cartoon man in a baggy early-1990s grey office suit with wide padded shoulders, a white shirt, a red tie and dark brown shoes. Instead of a human head, a big leafy bunch of fresh green celery stalks sticks straight up out of his shirt collar; there is no face at all, only celery. Dance: a goofy side-to-side shuffle, stepping left and right on the spot with loose swinging arms while the celery leaves bob. Full-body view of the whole character from the very top of the head down to the shoes, standing upright and facing the viewer in a relaxed ready-to-dance pose with the arms a little away from the body, centred in the picture with empty space all around, nothing cropped. Plain flat even light grey studio background with nothing else in the picture: no floor, no shadow, no props, no text, no logo. Low-fi early-1990s public-access TV computer graphics look, simple chunky shapes, soft flat lighting, slightly dated 3D render.",
+      "expression:smiling": "Celery Man: a tall lanky cartoon man in a baggy early-1990s grey office suit with wide padded shoulders, a white shirt, a red tie and dark brown shoes. Instead of a human head, a big leafy bunch of fresh green celery stalks sticks straight up out of his shirt collar; there is no face at all, only celery. Dance: a goofy side-to-side shuffle, stepping left and right on the spot with loose swinging arms while the celery leaves bob. Full-body view of the whole character from the very top of the head down to the shoes, standing upright and facing the viewer in a relaxed ready-to-dance pose with the arms a little away from the body, centred in the picture with empty space all around, nothing cropped. Plain flat even light grey studio background with nothing else in the picture: no floor, no shadow, no props, no text, no logo. Low-fi early-1990s public-access TV computer graphics look, simple chunky shapes, soft flat lighting, slightly dated 3D render. The character is smiling: clearly smiling with a big, happy expression.",
+      "motion": "Celery Man: a tall lanky cartoon man in a baggy early-1990s grey office suit with wide padded shoulders, a white shirt, a red tie and dark brown shoes. Instead of a human head, a big leafy bunch of fresh green celery stalks sticks straight up out of his shirt collar; there is no face at all, only celery. Dance: a goofy side-to-side shuffle, stepping left and right on the spot with loose swinging arms while the celery leaves bob. The character dances energetically on the spot in the middle of the frame and finishes the dance back in exactly the pose it started in. The whole body stays in view from head to feet the entire time. Locked-off static camera with no zoom, no pan and no cuts. The background is a plain flat magenta backdrop that stays perfectly even and still, with no shadows. Low-fi early-1990s public-access TV computer graphics look, simple chunky shapes, soft flat lighting, slightly dated 3D render. Smooth, playful, rhythmic motion.",
+      "negative": "camera movement, zoom in, zoom out, pan, tilt, cut, scene change, second character, crowd, text, subtitles, watermark, logo, floor, cast shadow, cropped feet, cropped head, leaving the frame, blurry, distorted body, extra limbs, melting, morphing, flicker, photorealistic person"
+    },
+    "costUsdEstimate": 0.34,
+    "seed": 4317,
+    "backdropForCutout": "magenta",
+    "loop": {
+      "typicalStep": 0.00719,
+      "seamBefore": 0.00448,
+      "crossfadeFrames": 0,
+      "seamAfter": 0.00448,
+      "frames": 96
+    },
+    "seconds": 368,
+    "machineGenerated": true,
+    "touchUp": "Backdrop-coloured edge glow removed afterwards with the generator's despill step (decoded, cleaned and re-encoded locally; no new generation)."
+  }
+}
