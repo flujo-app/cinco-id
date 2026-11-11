@@ -8,3 +8,4 @@ __pycache__/
 *.pyc
 .venv/
 test-results/
+dist/

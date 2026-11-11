@@ -45,6 +45,7 @@ function createWindow() {
   const common = {
     show: false,
     backgroundColor: overlay ? '#00000000' : '#008080',
+    icon: path.join(here, 'icon.png'),
     webPreferences: { preload: path.join(here, 'preload.cjs'), contextIsolation: true, sandbox: true, backgroundThrottling: false },
   };
   window = overlay

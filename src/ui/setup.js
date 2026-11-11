@@ -323,7 +323,8 @@ export function buildSetup(record, context) {
     function dancers() {
       title('New dancers');
       para('Saying "generate a new sequence of ..." makes a brand-new dancer in the cloud, on your own Modal account '
-        + '(about 6 minutes and about 35 cents per dancer). The demo dancers work without any of this.');
+        + '(about 6 minutes and about 35 cents per dancer). The demo dancers work without any of this. '
+        + 'docs/MEDIA.md explains the first time on your own account, including the free Hugging Face sign-in the better dance model needs.');
       const box = group('Modal');
       const lines = el('div', 'setup-facts');
       box.append(lines);
@@ -365,7 +366,7 @@ export function buildSetup(record, context) {
         } catch (problem) { line.textContent = problem.message; }
       };
       button(row, 'Sign in to Modal', () => run('modal-login'), 'modal-login');
-      button(row, 'Prepare...', () => { confirming = true; render(); }, 'prepare');
+      button(row, 'Prepare...', () => askToPrepare(), 'prepare');
 
       const or = group('OpenRouter (optional)');
       or.append(el('div', 'setup-hint', 'Only needed for the hosted dance models (MiniMax, Seedance). The key is kept encrypted on this PC and handed only to the dancer tools.'));
@@ -431,17 +432,23 @@ export function buildSetup(record, context) {
   function renderConfirm() {
     title('Prepare the dancer tools?');
     const info = prepare;
-    if (info?.found) {
+    if (!info) {
+      para('Asking the dancer tools what your Modal account still needs (this spends nothing)...');
+    } else if (info.found) {
+      if (info.summary) para(`The plan: ${info.summary}.`);
       para(`This sets up the tools for new dancers in your Modal account. It downloads ${info.size ? `about ${info.size} of models into your Modal cloud storage (not onto this PC)` : 'the models into your Modal cloud storage'}, `
-        + `takes about ${info.time} and costs about ${info.cost}, charged to your Modal account.`);
-      para(`(From ${info.source}.)`, 'setup-hint');
+        + `takes about ${info.time ?? 'a while'} and costs about ${info.cost ?? 'a few cents'}, charged to your Modal account. Anything your account already has is skipped.`);
+      if (info.danceModelNow) para(`New dancers would use ${info.danceModelNow} right now.${info.why ? ` ${info.why}` : ''}`, 'setup-hint');
+      if (info.ltxSignIn) para(info.ltxSignIn, 'setup-hint');
+      para(`(From ${info.source}.${info.fromTools ? '' : ' The dancer tools could not be asked directly, so these are the guide\'s numbers for an account that has nothing yet.'})`, 'setup-hint');
     } else {
-      para('This sets up the tools for new dancers in your Modal account and is charged to it. How much it costs could not be read from docs/MEDIA.md, so check there first.');
+      para('This sets up the tools for new dancers in your Modal account and is charged to it. How much it costs could not be found out, so read docs/MEDIA.md first.'
+        + (info.reason ? ` (${info.reason})` : ''));
     }
     para('Do you want to start it now?');
     const row = el('div', 'setup-row');
     page.append(row);
-    button(row, 'Yes, prepare', async () => {
+    const yes = button(row, 'Yes, prepare', async () => {
       confirming = false;
       render();
       const line = page.querySelector('.setup-status');
@@ -452,7 +459,22 @@ export function buildSetup(record, context) {
         render();
       } catch (problem) { if (line) line.textContent = problem.message; }
     }, 'prepare-yes');
+    yes.disabled = !info;
     button(row, 'No', () => { confirming = false; render(); }, 'prepare-no');
+  }
+
+  /** "Prepare...": first find out what it would cost on this account, then ask. */
+  async function askToPrepare() {
+    confirming = true;
+    prepare = null;
+    render();
+    try {
+      await api('/api/settings', { media: { python: draft.media.python }, announce: false });
+      prepare = (await api('/api/setup/prepare-info')).data;
+    } catch (problem) {
+      prepare = { found: false, reason: problem.message };
+    }
+    if (confirming) render();
   }
 
   function render(problem = null) {
@@ -525,7 +547,6 @@ export function buildSetup(record, context) {
       return;
     }
     refreshStatus();
-    api('/api/setup/prepare-info').then(({ data }) => { prepare = data; }).catch(() => {});
   })();
   render();
 }

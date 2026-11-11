@@ -58,7 +58,7 @@ try {
   await page.waitForFunction(() => /first sequence of the day/.test(document.querySelector('.console-log')?.textContent ?? ''), null, { timeout: 8000 });
   await picture('greeting');
 
-  await say('Computer, load up Celery Man please.', null);
+  await say('Computer, load up Celery Man please.', 'Yes, Paul.');
   assert.equal(await count('.window.kind-sequence'), 1, 'one dancer window');
   await picture('celery-man');
 

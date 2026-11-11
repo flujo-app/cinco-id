@@ -92,6 +92,9 @@ export async function checkEars(python, model, { hubCache = null, run = runProgr
 export async function prepareInfo(docsFile) {
   let text = '';
   try { text = await fs.readFile(docsFile, 'utf8'); } catch { return { found: false }; }
+  // The "Total" row of the table for a first run on a new Modal account, when the guide has one.
+  const total = /\|\s*\*\*Total\*\*\s*\|\s*\*\*([\d.,]+ ?[GMT]B)\*\*\s*\|\s*\*\*about ([^*|]+?)\*\*\s*\|\s*\*\*about (\$[\d.]+)\*\*/.exec(text);
+  if (total) return { found: true, size: total[1], time: total[2].trim(), cost: total[3], source: 'docs/MEDIA.md' };
   const paragraph = /`--prepare`[^\n]*builds[\s\S]*?(?:\n\s*\n|$)/.exec(text)?.[0] ?? '';
   const flat = paragraph.replace(/\s+/g, ' ');
   const size = /about ([\d.,]+ ?[GMT]B)/.exec(flat)?.[1] ?? null;
@@ -141,11 +144,13 @@ const ANSI = /\x1b\[[0-9;?]*[A-Za-z]|\x1b\][^\x07]*\x07/g;
  * The two longer jobs the Setup window can start, one at a time each:
  *   "modal-login": <python> -m modal setup         (Modal's own sign-in; it opens the browser)
  *   "prepare":     <python> tools/media/generate.py --prepare   (only with an explicit yes)
+ * plus the plan for "prepare" (<python> tools/media/generate.py --prepare --dry-run, spends nothing).
  */
 export class SetupTasks {
-  constructor({ getConfig, spawn = nodeSpawn, env = process.env, fileExists = exists }) {
+  constructor({ getConfig, spawn = nodeSpawn, run = runProgram, env = process.env, fileExists = exists }) {
     this.getConfig = getConfig;
-    this.spawn = spawn;
+    this.spawn = spawn ?? nodeSpawn;
+    this.run = run ?? runProgram;
     this.env = env;
     this.fileExists = fileExists;
     this.tasks = new Map();
@@ -221,6 +226,42 @@ export class SetupTasks {
       });
     });
     return this.status(name);
+  }
+
+  /**
+   * What preparing would download, how long it takes and what it costs on this Modal account.
+   * Asks the dancer tools themselves (`generate.py --prepare --dry-run`, which spends nothing);
+   * if that cannot run, falls back to the numbers in docs/MEDIA.md.
+   */
+  async plan({ docsFile = null } = {}) {
+    const config = this.getConfig();
+    const fallback = async reason => ({ ...(docsFile ? await prepareInfo(docsFile) : { found: false }), fromTools: false, reason });
+    let python;
+    try {
+      python = await checkPython(config.media.python, { allowBare: true, field: 'mediaPython', exists: this.fileExists });
+    } catch (error) { return fallback(error.message); }
+    if (!(await this.fileExists(config.media.script))) return fallback('The dancer tools are missing from this copy.');
+    const result = await this.run(python, [config.media.script, '--prepare', '--dry-run'], {
+      env: { ...this.env, PYTHONUTF8: '1', PYTHONUNBUFFERED: '1' }, timeoutMs: 120_000,
+    });
+    let answer = null;
+    for (const line of result.stdout.trim().split(/\r?\n/).reverse()) {
+      try { answer = JSON.parse(line); break; } catch { /* not JSON */ }
+    }
+    if (!answer?.prepare) return fallback(answer?.error ?? (result.error || result.stderr.trim().split('\n').at(-1) || 'The dancer tools did not answer.').slice(0, 300));
+    const plan = answer.prepare;
+    return {
+      found: true,
+      fromTools: true,
+      size: typeof plan.downloadGb === 'number' ? `${plan.downloadGb} GB` : null,
+      time: typeof plan.minutes === 'number' ? `${plan.minutes} minutes` : null,
+      cost: typeof plan.usdEstimate === 'number' ? `$${plan.usdEstimate.toFixed(2)}` : null,
+      summary: plan.summary ? String(plan.summary).slice(0, 400) : null,
+      ltxSignIn: plan.ltxSignIn ? String(plan.ltxSignIn).slice(0, 600) : null,
+      danceModelNow: answer.danceModelNow ? String(answer.danceModelNow).slice(0, 80) : null,
+      why: answer.why ? String(answer.why).slice(0, 400) : null,
+      source: 'the dancer tools (a dry run that spends nothing)',
+    };
   }
 
   stopAll() {

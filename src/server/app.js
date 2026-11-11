@@ -9,7 +9,7 @@ import { loadConfig } from './config.js';
 import { seedProjects } from './paths.js';
 import { SecretStore } from './secrets.js';
 import { SettingsError, publicSettings, validateSettings, writeSettingsFile } from './settings.js';
-import { SetupTasks, checkEars, findOnPath, prepareInfo, setupStatus } from './setup.js';
+import { SetupTasks, checkEars, findOnPath, setupStatus } from './setup.js';
 import { Library } from './projects.js';
 import { Computer } from './computer.js';
 import { createBrain } from './brain.js';
@@ -132,7 +132,7 @@ export async function createApp({ rootDir, dataDir = null, overrides = {}, env =
   const runningEars = JSON.stringify(config.voice.stt);
   // The Setup window opens by itself the first time, when there is no settings file yet.
   let firstRun = config.setup?.onFirstStart !== false && Boolean(config.configFile) && !existsSync(config.configFile);
-  const tasks = new SetupTasks({ getConfig: () => config, spawn: parts.spawn, env });
+  const tasks = new SetupTasks({ getConfig: () => config, spawn: parts.spawn, run: parts.probe?.run, env });
 
   const sockets = new Set();
   const broadcast = action => {
@@ -291,7 +291,7 @@ export async function createApp({ rootDir, dataDir = null, overrides = {}, env =
           secrets, probe: { ...probe, env: probe.env ?? env, listVoices, findCommand },
         }));
       }
-      if (route === '/api/setup/prepare-info') return send(response, 200, await prepareInfo(path.join(config.appDir, 'docs', 'MEDIA.md')));
+      if (route === '/api/setup/prepare-info') return send(response, 200, await tasks.plan({ docsFile: path.join(config.appDir, 'docs', 'MEDIA.md') }));
       if (route === '/api/setup/task') return send(response, 200, tasks.status(url.searchParams.get('name')));
       return send(response, 404, 'Not found.');
     }

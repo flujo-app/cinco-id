@@ -12,7 +12,20 @@ The dancers in the demo are invented people. Their pictures and dance clips are 
 
 ![The Win95 desktop full of dancing sequences](docs/screenshot.png)
 
-## Start it
+## Install
+
+Download `CINCO-ID-Setup-2.5.0.exe` from the [releases page](https://github.com/flujo-app/cinco-id/releases) and run
+it. It installs for your Windows user only and does not need administrator rights. You get a Start menu entry and a
+desktop shortcut; "CINCO ID" in Windows' "Apps" list removes it again (your settings and projects stay in your app
+data folder).
+
+The installer is not code-signed, so Windows SmartScreen shows "Windows protected your PC". Click **More info**, then
+**Run anyway**. Your browser may also warn about the download; choose to keep it.
+
+To make the installer yourself: `npm ci`, then `npm run dist` (installer in `dist/`) or `npm run pack` (an unpacked
+folder in `dist/win-unpacked`, to try without installing).
+
+## Start it from this folder
 
 ```powershell
 npm install
