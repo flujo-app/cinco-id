@@ -55,8 +55,13 @@ Everything it can load lives in `projects/`. Each project is a folder with a hex
 ("sequence") is a folder inside it. `projects/4d3d3d3` is the demo project. See [docs/PROJECTS.md](docs/PROJECTS.md).
 
 Every sequence has a simple drawn puppet, so it always works, even offline. When a generated video clip exists for
-a sequence, the clip is used instead. The clip generator and its costs are described in `docs/MEDIA.md` (once it has
-been added).
+a sequence, the clip is used instead. The demo cast ships ready-made as generated clips of invented people, so no
+account or key is needed to enjoy it.
+
+Saying "generate a new sequence of a grandmother in a gold tracksuit doing disco moves" makes a brand-new dancer in
+the background and offers it later as a beta sequence. That needs a Modal account, takes about six minutes and costs
+about 35 cents per dancer. Hosted video models through OpenRouter are an optional alternative. Details, models and
+real costs are in [docs/MEDIA.md](docs/MEDIA.md).
 
 ## Settings
 
