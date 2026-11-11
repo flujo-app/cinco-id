@@ -94,8 +94,14 @@ export async function createApp({ rootDir, dataDir = null, overrides = {}, env =
   const seeded = config.projectsDir === path.join(config.dataDir, 'projects')
     ? await seedProjects(config.bundledProjectsDir, config.projectsDir).catch(() => [])
     : [];
-  const library = await new Library(config.projectsDir).reload();
   const notes = [];
+  // New dancers that were still being made when the app last stopped are only half there.
+  const library = new Library(config.projectsDir);
+  const unfinished = await library.removeUnfinished().catch(() => []);
+  if (unfinished.length) {
+    notes.push(`${unfinished.length === 1 ? 'A new sequence was' : `${unfinished.length} new sequences were`} still being made when the computer last stopped, so ${unfinished.length === 1 ? 'it was' : 'they were'} removed: ${unfinished.map(dir => path.basename(dir)).join(', ')}.`);
+  }
+  await library.reload();
   const connectors = parts.connectors ?? await new Connectors(config.mcpServers, {
     declineTool: config.events.whatsapp.declineTool,
     onProblem: text => notes.push(text),
@@ -104,6 +110,14 @@ export async function createApp({ rootDir, dataDir = null, overrides = {}, env =
   // Two keys to the /mcp door: one for the computer's own brain (new on every start), and one
   // for outside agents you connect yourself (kept in the state folder so it stays the same).
   const speaker = parts.speaker ?? new Speaker(config.voice.tts, path.join(config.cacheDir, 'tts'));
+  if (!parts.speaker) {
+    // The robot voice may also be installed as a Python package; then it is the default voice.
+    await speaker.detect({ run: parts.probe?.runVoderCheck });
+    if (!config.voiceEngineChosen && config.voice.tts.engine !== 'voder' && speaker.voderInstalled) {
+      config.voice.tts.engine = 'voder';
+      speaker.engine = 'voder';
+    }
+  }
   const brainToken = randomBytes(24).toString('hex');
   const guestToken = config.mcp?.token ?? await keptToken(path.join(config.stateDir, 'mcp-token'));
   // Keys stored by the Setup window (desktop app only; encrypted with the Windows sign-in).
@@ -128,6 +142,9 @@ export async function createApp({ rootDir, dataDir = null, overrides = {}, env =
     voices: speaker,
   });
   await computer.restore();
+  // Outside tools that come back (or go away) later: tell the screen, and keep Decline honest.
+  connectors.on?.('change', () => computer.declineAvailabilityChanged());
+  connectors.on?.('note', text => computer.send({ type: 'note', text }));
   const listener = parts.listener ?? new Listener(config.voice.stt);
   const runningEars = JSON.stringify(config.voice.stt);
   // The Setup window opens by itself the first time, when there is no settings file yet.
@@ -406,10 +423,22 @@ export async function createApp({ rootDir, dataDir = null, overrides = {}, env =
     config, computer, library, server, speaker, listener, connectors, notes, guestToken, seeded, secrets, tasks,
     get firstRun() { return firstRun; },
     async listen() {
-      await new Promise((resolve, reject) => {
-        server.once('error', reject);
-        server.listen(config.port, '127.0.0.1', resolve);
+      const tryPort = wanted => new Promise((resolve, reject) => {
+        const failed = error => { server.off('listening', done); reject(error); };
+        const done = () => { server.off('error', failed); resolve(); };
+        server.once('error', failed);
+        server.once('listening', done);
+        server.listen(wanted, '127.0.0.1');
       });
+      try {
+        await tryPort(config.port);
+      } catch (error) {
+        if (error.code !== 'EADDRINUSE' || !config.port) throw error;
+        // Another program has the usual port: take a free one rather than not starting at all.
+        await tryPort(0);
+        notes.push(`Port ${config.port} is used by another program, so this copy uses port ${server.address().port}. `
+          + `Outside events such as WhatsApp calls are sent to port ${config.port} and will not arrive here until that port is free and CINCO ID is restarted.`);
+      }
       port = server.address().port;
       listener.warm();
       speaker.warm(['yes', 'ok', 'added', 'printing', 'betaOffer', 'notComputing', 'gateConfirm', 'generating', 'cleared', 'closed']
@@ -420,6 +449,7 @@ export async function createApp({ rootDir, dataDir = null, overrides = {}, env =
     async close() {
       for (const socket of sockets) socket.terminate();
       tasks.stopAll();
+      computer.generator?.stop?.();
       speaker.stop();
       listener.stop();
       await connectors.stop?.();

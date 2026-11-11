@@ -87,8 +87,11 @@ const builders = {
     row.append(el('div', 'icon icon-phone'), info);
     const buttons = el('div', 'button-row');
     const decline = el('button', 'w95', 'Decline');
-    decline.disabled = !desc.canDecline;
-    decline.title = desc.canDecline ? '' : 'Declining is not connected yet';
+    record.setCanDecline = can => {
+      decline.disabled = !can;
+      decline.title = can ? '' : 'Declining is not connected right now';
+    };
+    record.setCanDecline(desc.canDecline);
     decline.addEventListener('click', () => send({ type: 'call.decline', callId: call.callId }));
     const dismiss = el('button', 'w95', 'Dismiss');
     dismiss.addEventListener('click', () => wm.close(desc.id, { byHand: true }));
@@ -334,6 +337,13 @@ function handle(action) {
     }
     case 'setup.open':
       showSetup();
+      break;
+    case 'call.decline-state':
+      for (const { id, canDecline } of action.windows) {
+        const queued = wm.openQueue.find(desc => desc.id === id);
+        if (queued) queued.canDecline = canDecline;
+        wm.windows.get(id)?.setCanDecline?.(canDecline);
+      }
       break;
     case 'settings.changed':
       operator = action.operator ?? operator;

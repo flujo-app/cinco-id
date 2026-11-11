@@ -4,6 +4,7 @@ import { randomBytes } from 'node:crypto';
 import { bestMatch, hexFromSpeech, normalize, squash, editDistance } from './text.js';
 
 const HEX_ID = /^[0-9a-f]{1,16}$/;
+const GENERATING = '.generating'; // marker: this dancer is still being made
 
 async function readJson(file) {
   try {
@@ -98,6 +99,7 @@ export class Library {
       try { folders = await fs.readdir(path.join(dir, 'sequences'), { withFileTypes: true }); } catch { /* empty project */ }
       for (const folder of folders.sort((a, b) => a.name.localeCompare(b.name))) {
         if (!folder.isDirectory()) continue;
+        if (await exists(path.join(dir, 'sequences', folder.name, GENERATING))) continue; // still being made
         const sequence = await loadSequence(entry.name, path.join(dir, 'sequences', folder.name), folder.name);
         if (sequence) sequences.push(sequence);
       }
@@ -173,18 +175,49 @@ export class Library {
     return this.projects.get(id);
   }
 
-  /** Folder for a new sequence inside a project, with a safe folder name. */
+  /**
+   * Folder for a new sequence inside a project, with a safe folder name. It carries a marker
+   * file while the dancer is being made, so a half-made one is never offered and can be
+   * cleared away if the app stopped in the middle.
+   */
   async prepareSequence(projectId, name, spec = {}) {
     const project = this.projects.get(projectId);
     if (!project) throw new Error(`There is no project ${projectId}.`);
     const base = normalize(name).replace(/\s+/g, '-').slice(0, 40) || 'sequence';
     let id = base;
-    for (let n = 2; project.sequences.some(sequence => sequence.id === id); n++) id = `${base}-${n}`;
+    const taken = async candidate => project.sequences.some(sequence => sequence.id === candidate) || await exists(path.join(project.dir, 'sequences', candidate));
+    for (let n = 2; await taken(id); n++) id = `${base}-${n}`;
     const dir = path.join(project.dir, 'sequences', id);
     await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(path.join(dir, GENERATING), JSON.stringify({ started: new Date().toISOString(), pid: process.pid }) + '\n');
     await fs.writeFile(path.join(dir, 'sequence.json'), JSON.stringify({
       name: name.trim(), aliases: [], beta: true, hatLine: 0.25, expressions: [], ...spec,
     }, null, 2) + '\n');
     return { id, dir, key: `${projectId}/${id}` };
+  }
+
+  /** The new dancer is complete: take the marker away so it can be offered. */
+  async finishSequence(dir) {
+    await fs.rm(path.join(dir, GENERATING), { force: true });
+  }
+
+  /** Removes dancers that were still being made when the app last stopped. Returns their folders. */
+  async removeUnfinished() {
+    const removed = [];
+    let projects = [];
+    try { projects = await fs.readdir(this.root, { withFileTypes: true }); } catch { return removed; }
+    for (const project of projects) {
+      if (!project.isDirectory() || !HEX_ID.test(project.name)) continue;
+      let folders = [];
+      try { folders = await fs.readdir(path.join(this.root, project.name, 'sequences'), { withFileTypes: true }); } catch { continue; }
+      for (const folder of folders) {
+        const dir = path.join(this.root, project.name, 'sequences', folder.name);
+        if (folder.isDirectory() && await exists(path.join(dir, GENERATING))) {
+          await fs.rm(dir, { recursive: true, force: true });
+          removed.push(dir);
+        }
+      }
+    }
+    return removed;
   }
 }

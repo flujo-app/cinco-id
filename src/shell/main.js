@@ -1,11 +1,12 @@
 // The desktop shell: starts the computer and shows its screen, either as a normal window with
 // its own Win95 desktop, or as a see-through layer on top of your real desktop ("overlay").
-import { app, BrowserWindow, Menu, Tray, globalShortcut, ipcMain, nativeImage, safeStorage, screen, session, shell } from 'electron';
+import { app, BrowserWindow, Menu, Tray, dialog, globalShortcut, ipcMain, nativeImage, safeStorage, screen, session, shell } from 'electron';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createApp } from '../server/app.js';
 import { resolveDataDir } from '../server/paths.js';
+import { explainStartProblem } from '../server/problems.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.join(here, '..', '..');
@@ -63,8 +64,15 @@ function createWindow() {
   }
   const query = [overlay ? 'overlay=1' : null, flag('silent') ? 'silent=1' : null].filter(Boolean).join('&');
   window.loadURL(`http://127.0.0.1:${harness.port}/${query ? `?${query}` : ''}`);
-  window.once('ready-to-show', () => window.show());
-  window.on('closed', () => { window = null; });
+  const created = window;
+  created.once('ready-to-show', () => created.show());
+  created.on('closed', () => { if (window === created) window = null; });
+  // Closing the window while a new dancer is being made asks first (see quitSafely).
+  created.on('close', event => {
+    if (!mustAsk()) return;
+    event.preventDefault();
+    quitSafely();
+  });
 }
 
 function switchMode() {
@@ -117,7 +125,25 @@ async function printPage({ url, settings }) {
   }
 }
 
-app.whenReady().then(async () => {
+/**
+ * Quitting or restarting while a new dancer is still being made would lose it, so the computer
+ * asks first in its own window (Quit / Keep running). Returns false when the answer was no.
+ */
+let quitAllowed = false;
+async function quitSafely({ restart = false } = {}) {
+  if (!quitAllowed && harness?.computer.jobs.size) {
+    window?.show();
+    window?.focus();
+    if (!(await harness.computer.askToQuit({ restart }))) return false;
+  }
+  quitAllowed = true;
+  if (restart) app.relaunch();
+  app.quit();
+  return true;
+}
+const mustAsk = () => !quitAllowed && Boolean(harness?.computer.jobs.size);
+
+async function start() {
   const port = option('port');
   harness = await createApp({
     rootDir,
@@ -143,10 +169,7 @@ app.whenReady().then(async () => {
     return (await shell.openPath(folder)) || null;
   });
   // "Restart now" in the Setup window, for settings that only take effect on a fresh start.
-  ipcMain.handle('restart', () => {
-    app.relaunch();
-    app.quit();
-  });
+  ipcMain.handle('restart', () => quitSafely({ restart: true }));
 
   // The screen may use the microphone; nothing else gets asked for.
   session.defaultSession.setPermissionRequestHandler((_contents, permission, allow) => allow(permission === 'media'));
@@ -161,8 +184,39 @@ app.whenReady().then(async () => {
   globalShortcut.register('Control+Alt+Space', () => window?.webContents.send('toggle-listen'));
   globalShortcut.register('Control+Alt+O', switchMode);
   globalShortcut.register('Control+Alt+Q', () => app.quit());
-});
+}
 
+// Only one copy at a time: starting it again brings the running one to the front. (A copy with
+// its own data folder, such as a test copy, counts as a different one.)
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (!window) return;
+    if (window.isMinimized()) window.restore();
+    window.show();
+    window.focus();
+    harness?.computer.send({ type: 'note', text: 'CINCO ID was started again; this copy is the one that keeps running.' });
+  });
+  app.whenReady().then(start).catch(async error => {
+    // Never leave a program running that shows nothing: say what happened, then stop.
+    console.error(error);
+    const closing = harness;
+    harness = null;
+    await closing?.close().catch(() => {});
+    dialog.showMessageBoxSync({
+      type: 'error', title: 'CINCO ID could not start', message: 'CINCO ID could not start',
+      detail: explainStartProblem(error, { dataDir }), buttons: ['OK'], noLink: true,
+    });
+    app.exit(1);
+  });
+}
+
+app.on('before-quit', event => {
+  if (!mustAsk()) return;
+  event.preventDefault();
+  quitSafely();
+});
 app.on('window-all-closed', () => app.quit());
 app.on('will-quit', async event => {
   globalShortcut.unregisterAll();

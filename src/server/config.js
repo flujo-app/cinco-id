@@ -112,5 +112,7 @@ export async function loadConfig(rootDir, overrides = {}, { dataDir = null } = {
     cacheDir: path.join(data, '.cache'),
     bundledProjectsDir: path.join(rootDir, 'projects'),
     fromEnv: Object.keys(fromEnv),
+    // Whether someone picked the voice; if not, the robot voice is used once it is found.
+    voiceEngineChosen: Boolean(fromFile.voice?.tts?.engine || overrides.voice?.tts?.engine),
   };
 }
