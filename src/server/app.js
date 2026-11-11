@@ -1,12 +1,15 @@
 import http from 'node:http';
 import path from 'node:path';
-import { promises as fs, createReadStream } from 'node:fs';
+import { promises as fs, createReadStream, existsSync } from 'node:fs';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { handleMcp } from './mcp-endpoint.js';
 import { WebSocketServer } from 'ws';
 import { loadConfig } from './config.js';
 import { seedProjects } from './paths.js';
+import { SecretStore } from './secrets.js';
+import { SettingsError, publicSettings, validateSettings, writeSettingsFile } from './settings.js';
+import { SetupTasks, checkEars, findOnPath, prepareInfo, setupStatus } from './setup.js';
 import { Library } from './projects.js';
 import { Computer } from './computer.js';
 import { createBrain } from './brain.js';
@@ -103,21 +106,33 @@ export async function createApp({ rootDir, dataDir = null, overrides = {}, env =
   const speaker = parts.speaker ?? new Speaker(config.voice.tts, path.join(config.cacheDir, 'tts'));
   const brainToken = randomBytes(24).toString('hex');
   const guestToken = config.mcp?.token ?? await keptToken(path.join(config.stateDir, 'mcp-token'));
+  // Keys stored by the Setup window (desktop app only; encrypted with the Windows sign-in).
+  const secrets = await new SecretStore({ file: path.join(config.stateDir, 'secrets.json'), cipher: parts.secretCipher ?? null }).load();
+  const makeBrain = () => createBrain(config.brain, env, {
+    workDir: path.join(config.stateDir, 'brain'),
+    mcpUrl: () => `http://127.0.0.1:${port}/mcp`,
+    token: brainToken,
+    secrets,
+  });
+  // The dancer generator gets the stored OpenRouter key in its environment, never on its command line.
+  const makeGenerator = () => Generator.create(config.media, {
+    extraEnv: () => { const key = secrets.get('openrouter'); return key ? { OPENROUTER_API_KEY: key } : {}; },
+  });
   const computer = new Computer({
     library,
     config,
     stateFile: path.join(config.stateDir, 'state.json'),
-    brain: parts.brain !== undefined ? parts.brain : createBrain(config.brain, env, {
-      workDir: path.join(config.stateDir, 'brain'),
-      mcpUrl: () => `http://127.0.0.1:${port}/mcp`,
-      token: brainToken,
-    }),
-    generator: parts.generator !== undefined ? parts.generator : Generator.create(config.media),
+    brain: parts.brain !== undefined ? parts.brain : makeBrain(),
+    generator: parts.generator !== undefined ? parts.generator : makeGenerator(),
     connectors,
     voices: speaker,
   });
   await computer.restore();
   const listener = parts.listener ?? new Listener(config.voice.stt);
+  const runningEars = JSON.stringify(config.voice.stt);
+  // The Setup window opens by itself the first time, when there is no settings file yet.
+  let firstRun = config.setup?.onFirstStart !== false && Boolean(config.configFile) && !existsSync(config.configFile);
+  const tasks = new SetupTasks({ getConfig: () => config, spawn: parts.spawn, env });
 
   const sockets = new Set();
   const broadcast = action => {
@@ -127,6 +142,7 @@ export async function createApp({ rootDir, dataDir = null, overrides = {}, env =
   computer.on('action', broadcast);
 
   const ownOrigins = () => new Set([`http://127.0.0.1:${port}`, `http://localhost:${port}`]);
+  const ownHosts = () => new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
   /** Other websites open in a browser must not be able to give the computer orders. */
   const fromElsewhere = request => {
     const origin = request.headers.origin;
@@ -180,6 +196,17 @@ export async function createApp({ rootDir, dataDir = null, overrides = {}, env =
         if (request.method !== 'POST') return send(response, 405, { error: 'Only POST is supported.' });
         const body = JSON.parse((await readBody(request, 4 * 1024 * 1024)).toString('utf8'));
         return handleMcp(request, response, body, { computer, scope });
+      }
+
+      // The Setup window. On top of the origin check above, the address the request was sent to
+      // must be this computer's own, so a web page cannot sneak in under another name.
+      if (route === '/api/settings' || route.startsWith('/api/setup/')) {
+        if (!ownHosts().has(String(request.headers.host ?? '').toLowerCase())) return send(response, 403, 'Not allowed.');
+        try {
+          return await handleSetup(request, response, route, url);
+        } catch (error) {
+          return send(response, error.status ?? 500, { error: error.message, field: error.field ?? null });
+        }
       }
 
       if (request.method === 'GET') {
@@ -240,7 +267,114 @@ export async function createApp({ rootDir, dataDir = null, overrides = {}, env =
     return {
       ...computer.snapshot(), voice: voiceInfo(), notes,
       folders: { data: config.dataDir, projects: config.projectsDir, printouts: config.printouts.dir },
+      setup: { firstRun },
     };
+  }
+
+  // ---------- the Setup window ----------
+
+  const probe = parts.probe ?? {};
+  const listVoices = () => (probe.listVoices ?? (() => speaker.list()))();
+  const findCommand = name => (probe.findCommand ?? (wanted => findOnPath(wanted, { env })))(name);
+  let savedEars = config.voice.stt; // what the settings file says; the running ears change on restart
+
+  const readJson = async (request, limit = 64 * 1024) => {
+    try { return JSON.parse((await readBody(request, limit)).toString('utf8') || '{}'); } catch { throw new SettingsError('That could not be read.'); }
+  };
+
+  async function handleSetup(request, response, route, url) {
+    const shown = () => publicSettings({ ...config, voice: { ...config.voice, stt: savedEars } }, { secrets, env, speaker, firstRun });
+    if (request.method === 'GET') {
+      if (route === '/api/settings') return send(response, 200, shown());
+      if (route === '/api/setup/status') {
+        return send(response, 200, await setupStatus({ ...config, voice: { ...config.voice, stt: savedEars } }, {
+          secrets, probe: { ...probe, env: probe.env ?? env, listVoices, findCommand },
+        }));
+      }
+      if (route === '/api/setup/prepare-info') return send(response, 200, await prepareInfo(path.join(config.appDir, 'docs', 'MEDIA.md')));
+      if (route === '/api/setup/task') return send(response, 200, tasks.status(url.searchParams.get('name')));
+      return send(response, 404, 'Not found.');
+    }
+    if (request.method !== 'POST') return send(response, 405, 'Not allowed.');
+    const body = await readJson(request);
+    if (route === '/api/settings') return send(response, 200, await saveSettings(body));
+    if (route === '/api/setup/test-voice') {
+      const { changes } = await validateSettings({ voice: { tts: { engine: body.engine, voice: body.voice } } }, { voices: await listVoices() });
+      const tts = changes.voice.tts;
+      if (tts.engine === 'browser') return send(response, 204, '');
+      let name = config.operator;
+      try { name = (await validateSettings({ operator: body.operator })).changes.operator ?? name; } catch { /* keep the current name */ }
+      const tester = new Speaker({ ...config.voice.tts, engine: tts.engine, voice: tts.voice }, path.join(config.cacheDir, 'tts'));
+      try {
+        const file = await tester.speak(`Hello, ${name}. This is how I sound.`);
+        return serveFile(response, path.dirname(file), path.basename(file));
+      } catch (error) {
+        throw Object.assign(new Error(`That voice did not work: ${error.message}`), { status: 500 });
+      } finally {
+        tester.stop();
+      }
+    }
+    if (route === '/api/setup/test-ears') {
+      const { changes } = await validateSettings({ voice: { stt: { engine: 'whisper', python: body.python, model: body.model } } }, { exists: probe.fileExists });
+      const ears = changes.voice.stt;
+      return send(response, 200, await (probe.checkEars ?? checkEars)(ears.python, ears.model, { hubCache: savedEars.hubCache ?? null }));
+    }
+    if (route === '/api/setup/task') return send(response, 200, await tasks.start(String(body.task), { confirm: body.confirm === true }));
+    return send(response, 404, 'Not found.');
+  }
+
+  async function saveSettings(input) {
+    if (!config.configFile) throw new SettingsError('Settings are switched off for this copy, so nothing can be saved.', null, 409);
+    const { changes, secrets: keys } = await validateSettings(input, {
+      voices: input?.voice?.tts !== undefined ? await listVoices() : [],
+      canStoreSecrets: secrets.canStore,
+      claudeFound: input?.brain?.engine === 'claude-cli' ? Boolean(await findCommand('claude')) : false,
+      exists: probe.fileExists,
+    });
+    await writeSettingsFile(config.configFile, changes);
+    for (const [name, value] of Object.entries(keys)) {
+      if (value === null) await secrets.remove(name);
+      else await secrets.set(name, value);
+    }
+    firstRun = false;
+
+    // Apply what can be applied right away: the name, the voice, the brain and the dancer tools.
+    // The name still comes from CINCO_ID_OPERATOR while that is set.
+    const fresh = await loadConfig(rootDir, overrides, { dataDir: config.dataDir });
+    const restart = [];
+    config.operator = fresh.operator;
+    computer.operator = fresh.operator;
+    if (changes.voice?.tts) {
+      Object.assign(config.voice.tts, changes.voice.tts);
+      const { engine, voice } = changes.voice.tts;
+      const chosen = await speaker.use({ engine, name: engine === 'voder' ? 'Robot' : engine === 'browser' ? 'Browser' : voice });
+      computer.voiceChoice = chosen;
+      await computer.persist().catch(() => {});
+      computer.send({ type: 'quiet' });
+    }
+    if (changes.brain || 'brain' in keys) {
+      config.brain = { ...config.brain, ...(changes.brain ?? {}) };
+      if (parts.brain === undefined) computer.brain = makeBrain();
+    }
+    if (changes.media) {
+      config.media = { ...config.media, ...changes.media };
+      if (parts.generator === undefined) computer.generator = makeGenerator();
+    }
+    if (changes.voice?.stt) savedEars = { ...savedEars, ...changes.voice.stt };
+    if (JSON.stringify(savedEars) !== runningEars) restart.push('listening');
+    broadcast({ type: 'settings.changed', operator: computer.operator, voice: voiceInfo(), setup: { firstRun } });
+    if (input?.announce !== false && (Object.keys(changes).length || Object.keys(keys).length)) computer.say('settingsSaved');
+    return {
+      ok: true,
+      restart,
+      operator: computer.operator,
+      operatorFromEnv: fresh.fromEnv.includes('operator'),
+      settings: shownAfterSave(),
+    };
+  }
+
+  function shownAfterSave() {
+    return publicSettings({ ...config, voice: { ...config.voice, stt: savedEars } }, { secrets, env, speaker, firstRun });
   }
 
   const wss = new WebSocketServer({ noServer: true });
@@ -269,7 +403,8 @@ export async function createApp({ rootDir, dataDir = null, overrides = {}, env =
   });
 
   return {
-    config, computer, library, server, speaker, listener, connectors, notes, guestToken, seeded,
+    config, computer, library, server, speaker, listener, connectors, notes, guestToken, seeded, secrets, tasks,
+    get firstRun() { return firstRun; },
     async listen() {
       await new Promise((resolve, reject) => {
         server.once('error', reject);
@@ -284,6 +419,7 @@ export async function createApp({ rootDir, dataDir = null, overrides = {}, env =
     get port() { return port; },
     async close() {
       for (const socket of sockets) socket.terminate();
+      tasks.stopAll();
       speaker.stop();
       listener.stop();
       await connectors.stop?.();

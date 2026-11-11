@@ -68,10 +68,35 @@ the background and offers it later as a beta sequence. That needs a Modal accoun
 about 35 cents per dancer. Hosted video models through OpenRouter are an optional alternative. Details, models and
 real costs are in [docs/MEDIA.md](docs/MEDIA.md).
 
+## Setup window
+
+The first time it starts, a Setup window opens by itself. It asks what the computer should call you, which voice
+it uses (with a "Say something" button to hear it), whether it should listen to you, which brain it uses, and
+whether you want to make new dancers on your own Modal account. Press Next to skip anything you do not need.
+Open it again any time from the Start menu ("Setup..."), or by saying or typing "setup" or "settings".
+
+- Keys you type into it (for a brain service or for OpenRouter) are kept encrypted with your Windows sign-in, in
+  the data folder. They are never shown again, never written into the settings file and never put on a command
+  line. Started with `npm run serve` (no desktop window), keys come from environment variables only.
+- "Sign in to Modal" runs Modal's own sign-in, which opens your browser. "Prepare..." sets up the dancer tools in
+  your Modal account, but only after it has shown what that costs and you said yes.
+- Changes to the name, voice and brain apply at once. Listening changes need a restart; Setup offers "Restart now".
+
+## Where your things are kept
+
+| Started as | Settings, memory, printouts, voice cache and projects |
+|---|---|
+| Installed app | your own app data folder, `%APPDATA%\CINCO ID` (the demo project is copied there on the first start) |
+| From this folder (`npm start`, `npm run serve`) | this folder, as before |
+| With `CINCO_ID_DATA_DIR` set (or `--data-dir=`) | that folder |
+
+The Start menu on the screen has "Projects folder" and "Printouts folder" to open them.
+
 ## Settings
 
-Copy `harness.config.example.json` to `harness.config.json` and change what you need. That file stays on your PC
-and is not put into git. Without it, the fixed phrases, puppets, effects and the test call all still work.
+The Setup window writes `harness.config.json` in the data folder. You can also copy `harness.config.example.json`
+there and change it by hand. That file stays on your PC and is not put into git. Without it, the fixed phrases,
+puppets, effects and the test call all still work.
 
 - **Your name**: `operator`. The computer addresses you by it.
 - **Voice out**: uses the Voder robot voice if the `voder` project sits next to this folder. Otherwise the
@@ -108,7 +133,7 @@ While it runs, the computer offers a local door for AI agents at `http://127.0.0
 Anything that can use MCP tools, such as FLUJO, Claude Code, Codex or a swarm, can then load sequences, apply
 effects, open note windows, make it speak, or simply send it a sentence as if you had said it.
 
-The door only opens with the access token in `.local/mcp-token` (sent as `Authorization: Bearer <token>`), and only
+The door only opens with the access token in `.local/mcp-token` in the data folder (sent as `Authorization: Bearer <token>`), and only
 from this PC.
 
 ## Safety
@@ -123,6 +148,7 @@ from this PC.
 ```powershell
 npm test                                   # fast checks of the logic, the local server and the security rules
 npm run test:ui                            # starts the real app silently and plays the whole routine
+node test/ui/setup-check.mjs               # goes through the Setup window like a first start (no money, no browser)
 node test/ui/overlay-check.mjs             # checks the see-through mode on the real desktop (Windows)
 node test/ui/print-check.mjs               # checks that a printout reaches the Windows print system
 node test/ui/clip-check.mjs "Celery Head"  # checks that a generated clip plays see-through

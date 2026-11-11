@@ -86,6 +86,11 @@ export function parseCommand(text, world) {
   }
   if (/^what (?:do we|have we|can you|do you) (?:have|got|do|load)/.test(said) || said === 'help') return { intent: 'list', what: 'everything' };
 
+  // The Setup window
+  if (/^(?:(?:open|show|show me|start|run|change|go to)(?: the| my| your)? )?(?:setup|set up|settings|preferences|options|control panel)(?: window| wizard)?$/.test(said.replace(ASK, ''))) {
+    return { intent: 'setup' };
+  }
+
   // Quiet, clearing up
   if (/^(?:quiet|be quiet|shut up|silence|mute|stop talking)$/.test(said)) return { intent: 'mute' };
   // Which voice the computer speaks with

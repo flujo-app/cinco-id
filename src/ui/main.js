@@ -1,6 +1,7 @@
 import { WindowManager } from './wm.js';
 import { Stage, SequenceView, renderStill, clipStatus } from './stage.js';
 import * as sound from './sound.js';
+import { buildSetup } from './setup.js';
 
 const shell = window.shell ?? null; // present when running inside the desktop shell
 const query = new URLSearchParams(location.search);
@@ -137,6 +138,16 @@ const builders = {
     }).catch(error => { status.textContent = `Could not print: ${error.message}`; });
   },
 
+  setup(record, desc) {
+    buildSetup(record, {
+      shell,
+      sound,
+      firstRun: desc.firstRun,
+      close: () => wm.close('setup', { byHand: true }),
+      onFinished: saved => setupClosed(desc.firstRun, saved),
+    });
+  },
+
   console(record) {
     const box = el('div', 'console');
     const log = el('div', 'console-log');
@@ -220,8 +231,28 @@ const wm = new WindowManager({
   desktop: document.getElementById('desktop'),
   tasks: document.getElementById('tasks'),
   builders,
-  onClosed: (id, desc) => { if (desc.kind !== 'console') send({ type: 'window.closed', id }); updateMusic(); },
+  onClosed: (id, desc) => { if (desc.kind !== 'console' && desc.kind !== 'setup') send({ type: 'window.closed', id }); updateMusic(); },
 });
+
+// ---------- the Setup window ----------
+
+let setupPending = false; // the first start: the greeting waits until Setup is closed
+
+function showSetup({ firstRun = false } = {}) {
+  const existing = wm.windows.get('setup');
+  if (existing) { wm.minimise(existing, false); return; }
+  wm.open({ id: 'setup', kind: 'setup', title: 'CINCO ID Setup', firstRun }, { instant: true });
+}
+
+async function setupClosed(firstRun, saved) {
+  if (!firstRun) return;
+  // Closed on the first start without saving: remember that, so it does not ask on every start.
+  if (!saved) {
+    await fetch('/api/settings', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ announce: false }) }).catch(() => {});
+  }
+  setupPending = false;
+  if (!greeted) { greeted = true; send({ type: 'hello' }); }
+}
 
 function showConsole() {
   const existing = wm.windows.get('console');
@@ -281,7 +312,7 @@ function handle(action) {
       voice = action.voice ?? voice;
       folders = action.folders ?? folders;
       sound.setVoiceMode(voice.speak);
-      wm.closeAll(record => record.desc.kind !== 'console');
+      wm.closeAll(record => record.desc.kind !== 'console' && record.desc.kind !== 'setup');
       for (const window of action.windows) wm.open(window, { instant: true });
       drawIcons(action.projects);
       showConsole();
@@ -294,9 +325,21 @@ function handle(action) {
       consoleUi.talk.title = voice.listen ? 'Hold to talk' : 'Speech recognition is not set up';
       document.getElementById('tray-mic').classList.toggle('off', !voice.listen);
       updateMusic();
-      if (!greeted) { greeted = true; send({ type: 'hello' }); }
+      if (action.setup?.firstRun && !greeted && !setupPending) {
+        setupPending = true;
+        showSetup({ firstRun: true });
+      }
+      if (!greeted && !setupPending) { greeted = true; send({ type: 'hello' }); }
       break;
     }
+    case 'setup.open':
+      showSetup();
+      break;
+    case 'settings.changed':
+      operator = action.operator ?? operator;
+      voice = action.voice ?? voice;
+      sound.setVoiceMode(voice.speak);
+      break;
     case 'say':
       logLine('computer', action.text);
       sound.say(action.speak ?? action.text);
@@ -421,7 +464,7 @@ function setListening(on) {
 }
 
 addEventListener('keydown', event => {
-  if (event.code !== 'Space' || event.repeat || event.target.closest('input, textarea, button')) return;
+  if (event.code !== 'Space' || event.repeat || event.target.closest('input, textarea, button, select, .kind-setup')) return;
   event.preventDefault();
   startListening();
 });
@@ -447,7 +490,9 @@ startMenu.addEventListener('click', event => {
   else if (action === 'test-call') command('test call');
   else if (action === 'clear') command('clear the desktop');
   else if (action?.startsWith('folder-')) openFolder(action.slice(7));
+  else if (action === 'setup') showSetup();
 });
+shell?.onOpenSetup?.(() => showSetup());
 
 /** Opens the projects or printouts folder in Windows. In a plain browser it shows where it is. */
 async function openFolder(which) {
