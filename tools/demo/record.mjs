@@ -120,6 +120,7 @@ try {
   // ---- 2. The 4d3d3d3 routine ----
   await say('Computer, load up Celery Man please.', { after: 1500 });
   await say('Could you kick up the 4d3d3d3?', { after: 4500 });
+  await say('More disco.', { after: 3500 });
   await say('Add sequence: Oyster.', { after: 1200 });
   await say('Give me a printout of Oyster smiling.', { after: 4200 });
   await say('Computer, do we have any new sequences?');
@@ -133,8 +134,9 @@ try {
 
   // ---- 3. The dancer that was made from one sentence ----
   await say('clear the desktop', { after: 900 });
-  await say('kick up the d15c0', { after: 4500 });
-  await say('rainbow', { after: 3500 });
+  await say('kick up the d15c0', { after: 3500 });
+  await say('Mooooore discooooo!', { after: 5000 });
+  await say('rainbow', { after: 4000 });
 
   // ---- 4. A call comes in ----
   await say('test call from my wife', { after: 1800 });

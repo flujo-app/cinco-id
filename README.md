@@ -39,7 +39,7 @@ There is also [the same demo with the robot voice](docs/demo-robot-voice.mp4).
 
 ## Install
 
-Download `CINCO-ID-Setup-2.5.1.exe` from the [releases page](https://github.com/flujo-app/cinco-id/releases) and run
+Download `CINCO-ID-Setup-2.5.2.exe` from the [releases page](https://github.com/flujo-app/cinco-id/releases) and run
 it. It installs for your Windows user only and does not need administrator rights. You get a Start menu entry and a
 desktop shortcut; "CINCO ID" in Windows' "Apps" list removes it again (your settings and projects stay in your app
 data folder).
@@ -61,7 +61,7 @@ npm run overlay    # see-through: the windows and dancers sit on top of your rea
 ```
 
 A fresh copy works straight away with no accounts: the desktop, the demo dancers, every fixed phrase, the effects,
-the music, the test call, printing, and speech in the voice built into Windows.
+the disco music, the test call, printing, and speech in the voice built into Windows.
 
 Keys that work everywhere while it runs:
 
@@ -88,7 +88,7 @@ In the window you can also hold the space bar to talk, or type into the "Compute
 | "Free" | takes the dancers out of their windows (best in see-through mode) |
 | "Rainbow on Oyster", "tumble", "trails", "conga" ... | more effects; "normal" removes them |
 | "Close Oyster", "clear the desktop" | tidies up |
-| "Music off", "quiet" | stops the lounge music or the voice |
+| "More disco", "music off", "quiet" | starts or stops the disco music, or stops the voice |
 | "What voices do you have?", "use the Zira voice", "talk like the robot" | lists and switches the computer's voice |
 | "Test call from my wife", then "answer the call" or "decline" | shows what an incoming call looks like |
 | "New project", "kick up the beef" | makes a new, empty project with a hex name |

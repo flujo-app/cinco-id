@@ -410,7 +410,7 @@ function handle(action) {
       break;
     case 'sound': sound.play(action.name); break;
     case 'quiet': sound.quiet(); break;
-    case 'music': musicChoice = action.on ? 'on' : 'off'; updateMusic(); break;
+    case 'music': musicChoice = action.on ? 'on' : 'off'; updateMusic(); if (action.on && action.more) sound.moreDisco(); break;
     case 'projects': drawIcons(action.projects); break;
     case 'note': logLine('system', action.text); break;
     case 'thinking': status(action.on ? 'Computing...' : ''); break;

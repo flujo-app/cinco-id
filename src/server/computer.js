@@ -259,7 +259,7 @@ export class Computer extends EventEmitter {
       case 'list': return this.list(command.what);
       case 'mute': return this.send({ type: 'quiet' });
       case 'setup': this.send({ type: 'setup.open', page: command.page ?? null }); return this.say('setupOpen');
-      case 'music': this.send({ type: 'music', on: command.on }); return this.say('ok');
+      case 'music': this.send({ type: 'music', on: command.on, more: command.more === true }); return this.say('ok');
       case 'voice.list': return this.listVoices();
       case 'voice.use': return this.useVoice(command.name);
       case 'generate': return this.generate(command.prompt, command.name);

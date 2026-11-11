@@ -105,8 +105,11 @@ export function parseCommand(text, world) {
   if ((m = plain.match(/^(?:change|switch|set) (?:your |the )?voice to (?:the )?(.+?)(?: voice)?$/))) return { intent: 'voice.use', name: m[1] };
   if ((m = plain.match(/^(?:talk|speak|sound) like (?:the |a )?(.+)$/))) return { intent: 'voice.use', name: m[1] };
 
-  if (/^(?:(?:stop|kill|cut|no|turn off) (?:the )?music|music off)$/.test(said)) return { intent: 'music', on: false };
-  if (/^(?:(?:play|start|put on|turn on|some|give me some|hit the) (?:the |some )?music|music|music on)$/.test(said)) return { intent: 'music', on: true };
+  // Music. "Mooooore discooooo" counts too: stretched words are fine.
+  if (/^(?:(?:stop|kill|cut|no|turn off) (?:the )?(?:music|disco+)|(?:music|disco+) off)$/.test(said)) return { intent: 'music', on: false };
+  if (/^(?:(?:(?:play|start|put on|turn on|some|give me some|give me|hit the|and|even|much|way) )*(?:mo+re )*(?:the |some )?(?:music|disco+(?: music)?)|(?:music|disco+) on)$/.test(said)) {
+    return { intent: 'music', on: true, more: /\bmo+re\b/.test(said) };
+  }
   if (/^(?:clear|clear (?:the )?(?:desktop|screen)|shut it down|shut down|close everything|close all|close all windows|stop everything|kill everything|reset|clean up)$/.test(said)) {
     return { intent: 'close.all' };
   }
