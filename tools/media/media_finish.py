@@ -176,14 +176,37 @@ def bleed_colors(rgb: np.ndarray, alpha: np.ndarray, radius: float = 6.0) -> np.
     return np.where(a > 0.0, rgb, fill).astype(np.float32)
 
 
+def despill(rgb: np.ndarray, alpha: np.ndarray, key: np.ndarray, band: int = 3) -> np.ndarray:
+    """Remove the backdrop's tint from the figure's outer edge.
+
+    Only pixels near the outline are touched. In those, the part of the colour
+    that points in the backdrop's colour direction is taken out, so a magenta
+    glow on a grey sleeve turns grey again while green celery stays green.
+    """
+    rgbf = rgb.astype(np.float32)
+    key = np.asarray(key, np.float32)
+    direction = key - key.mean()
+    norm = float(np.linalg.norm(direction))
+    if norm < 1e-3:
+        return rgbf  # a grey or white backdrop has no tint to remove
+    direction /= norm
+    near_edge = blur(alpha[..., None].astype(np.float32), band)[..., 0] < 0.97
+    chroma = rgbf - rgbf.mean(axis=2, keepdims=True)
+    spill = np.maximum(0.0, chroma @ direction)
+    cleaned = np.clip(rgbf - spill[..., None] * direction[None, None, :], 0.0, 1.0)
+    return np.where(near_edge[..., None], cleaned, rgbf).astype(np.float32)
+
+
 def cutout(rgb: np.ndarray, alpha: np.ndarray, background: np.ndarray | None = None,
-           tidy: bool = True) -> np.ndarray:
+           tidy: bool = True, key: np.ndarray | None = None) -> np.ndarray:
     """RGB picture + rough alpha -> clean straight RGBA float image."""
     background = border_color(rgb) if background is None else background
     alpha = clean_alpha(rgb, alpha, background)
     if tidy:
         alpha = keep_main_figure(alpha)
     color = decontaminate(rgb, alpha, background)
+    if key is not None:
+        color = despill(color, alpha, key)
     color = bleed_colors(color, alpha)
     return np.dstack([color, alpha]).astype(np.float32)
 

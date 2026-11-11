@@ -101,6 +101,19 @@ class FinishingTests(unittest.TestCase):
         self.assertEqual(rgba[93, 30, 3], 0.0)
         self.assertEqual(rgba[50, 30, 3], 1.0)
 
+    def test_despill_removes_backdrop_glow_on_edges_only(self):
+        magenta = np.array([1.0, 0.0, 1.0], np.float32)
+        rgb = np.full((40, 40, 3), 0.5, np.float32)
+        rgb[:, :20] = (0.62, 0.42, 0.62)                         # grey with a magenta glow
+        alpha = np.zeros((40, 40), np.float32)
+        alpha[:, 12:] = 1.0                                      # edge at column 12
+        cleaned = F.despill(rgb, alpha, magenta)
+        edge = cleaned[20, 13]
+        self.assertLess(abs(edge[0] - edge[1]), 0.02)            # glow gone: grey again
+        self.assertTrue(np.allclose(cleaned[20, 30], rgb[20, 30]))  # interior untouched
+        green = np.full((10, 10, 3), (0.2, 0.8, 0.2), np.float32)
+        self.assertTrue(np.allclose(F.despill(green, np.full((10, 10), 0.5, np.float32), magenta), green))
+
     def test_key_color_avoids_figure_colours(self):
         rgb = np.zeros((40, 40, 3), np.uint8)
         rgb[:] = (20, 200, 20)                       # a very green figure (celery!)

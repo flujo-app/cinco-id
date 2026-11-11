@@ -115,6 +115,24 @@ def run_remote(function, argument, rate: float, ledger: dict, label: str):
         ledger["usd"] += seconds * rate
 
 
+def remote_step(work: Path | None, label: str, request, run):
+    """Run one cloud step, or reuse its saved result from --work when the request is identical."""
+    import hashlib
+    import pickle
+    if work is None:
+        return run()
+    payload = request if isinstance(request, bytes) else json.dumps(request, sort_keys=True, default=lambda b: hashlib.sha256(b).hexdigest()).encode()
+    path = work / f"{label}-{hashlib.sha256(payload).hexdigest()[:16]}.pickle"
+    if path.exists():
+        with path.open("rb") as stream:
+            return pickle.load(stream)
+    result = run()
+    work.mkdir(parents=True, exist_ok=True)
+    with path.open("wb") as stream:
+        pickle.dump(result, stream)
+    return result
+
+
 def load_rgb_alpha(picture_png: bytes, alpha_png: bytes):
     import numpy as np
     from PIL import Image
@@ -153,6 +171,7 @@ def generate(args: argparse.Namespace) -> dict:
         raise Failure(f"One dancer can cost up to ${S.WORST_CASE_USD:.2f}, above the allowed ${args.max_cost:.2f}")
     ledger = {"usd": 0.0, "steps": []}
     started = time.monotonic()
+    work = Path(args.work).resolve() if args.work else None
 
     progress("setup", 0.02, "Waking up the cloud computers")
     with contextlib.redirect_stdout(sys.stderr):
@@ -167,9 +186,10 @@ def generate(args: argparse.Namespace) -> dict:
             # 1. Character picture (+ expressions), cut out.
             prompts = build_prompts(args.name, args.prompt, None, expressions)
             progress("image", 0.08, "Drawing the character")
-            drawn = run_remote(C.draw, {"prompt": prompts["image"], "seed": seed,
-                                        "expressions": {e: prompts[f"expression:{e}"] for e in expressions}},
-                               S.ART_RATE, ledger, "draw and cut out stills")
+            draw_request = {"prompt": prompts["image"], "seed": seed,
+                            "expressions": {e: prompts[f"expression:{e}"] for e in expressions}}
+            drawn = remote_step(work, "draw", draw_request, lambda: run_remote(
+                C.draw, draw_request, S.ART_RATE, ledger, "draw and cut out stills"))
             progress("image", 0.25, "Cutting the character out of the picture")
             rgb, alpha, rgba, placed = make_still(drawn["picture"], drawn["alpha"])
             key_name, key_color = F.choose_key_color(rgb, rgba[..., 3])
@@ -181,15 +201,18 @@ def generate(args: argparse.Namespace) -> dict:
 
             # 2. Dance.
             progress("motion", 0.3, "Teaching the character to dance (this is the slow part, about 3 to 5 minutes)")
-            moved = run_remote(C.animate, {
+            motion_request = {
                 "keyframe": buffer.getvalue(), "prompt": prompts["motion"], "negative_prompt": NEGATIVE,
                 "seed": seed, "width": S.MOTION_WIDTH, "height": S.MOTION_HEIGHT,
                 "num_frames": S.MOTION_FRAMES, "settings": S.LTX_SETTINGS,
-            }, S.MOTION_RATE, ledger, "dance")
+            }
+            moved = remote_step(work, "dance", motion_request, lambda: run_remote(
+                C.animate, motion_request, S.MOTION_RATE, ledger, "dance"))
 
             # 3. Cut the dancer out of every frame.
             progress("cutout", 0.7, "Removing the background from every frame")
-            matted = run_remote(C.cut_out, moved["video"], S.ART_RATE, ledger, "cut out frames")
+            matted = remote_step(work, "cutout", moved["video"], lambda: run_remote(
+                C.cut_out, moved["video"], S.ART_RATE, ledger, "cut out frames"))
 
     progress("loop", 0.8, "Making the dance loop smoothly")
     with tempfile.TemporaryDirectory(prefix="beta-sequence-media-") as tmp:
@@ -205,7 +228,7 @@ def generate(args: argparse.Namespace) -> dict:
         backdrop = F.border_color(frame)
         if np.linalg.norm(backdrop - key) > 0.35:
             backdrop = key
-        cut = F.cutout(frame, frame_alpha, backdrop)
+        cut = F.cutout(frame, frame_alpha, backdrop, key=key)
         frames.append(F.resize_rgba(cut, (S.OUTPUT_WIDTH, S.OUTPUT_HEIGHT)))
     looped, loop_report = F.make_loop(frames)
 
@@ -264,6 +287,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--seed", type=int)
     parser.add_argument("--max-cost", type=float, default=1.5, help="refuse to start above this many US dollars")
     parser.add_argument("--prepare", action="store_true", help="download and check the tools only")
+    parser.add_argument("--work", help="folder that keeps the raw cloud results, so finishing can be redone for free")
     try:
         args = parser.parse_args(argv)
     except SystemExit as exit_:
