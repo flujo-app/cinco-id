@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { findSecret } from './secrets.js';
 
 /**
  * The brain: an AI model that handles everything the fixed phrases do not cover.
@@ -276,7 +277,8 @@ export function createBrain(config, env = process.env, local = {}) {
     });
   }
   if (!config.model) return null;
-  const apiKey = config.apiKeyEnv ? env[config.apiKeyEnv] : null;
+  // The key stored by the Setup window comes first, then the environment variable.
+  const apiKey = findSecret('brain', { secrets: local.secrets, env, config: { brain: config } }).value;
   if (config.apiKeyEnv && !apiKey) return null;
   return new Brain({ baseUrl: config.baseUrl, apiKey, model: config.model, maxSteps: config.maxSteps });
 }

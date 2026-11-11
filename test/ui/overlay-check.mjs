@@ -9,7 +9,7 @@ import { execFileSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
-import { launchOptions, takeOption } from './launch.mjs';
+import { freePort, launchOptions, takeOption } from './launch.mjs';
 
 const args = process.argv.slice(2);
 const exe = takeOption(args, '--exe');
@@ -40,7 +40,7 @@ function programAt(x, y) {
 }
 
 const app = await electron.launch(launchOptions({
-  exe, port: 19783, dataDir: path.join(temp, 'data'), args: ['--overlay'],
+  exe, port: await freePort(19783), dataDir: path.join(temp, 'data'), args: ['--overlay'],
   env: { CINCO_ID_CONFIG: 'none', CINCO_ID_OPERATOR: 'Paul' },
 }));
 try {

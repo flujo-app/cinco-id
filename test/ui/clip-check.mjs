@@ -7,7 +7,7 @@ import { _electron as electron } from 'playwright-core';
 import os from 'node:os';
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
-import { launchOptions, takeOption } from './launch.mjs';
+import { freePort, launchOptions, takeOption } from './launch.mjs';
 import { leftSwitchedOff, windows } from './desktop.mjs';
 
 const args = process.argv.slice(2);
@@ -20,7 +20,7 @@ const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'cinco-id-clip-'));
 const before = windows();
 
 const app = await electron.launch(launchOptions({
-  exe, port: 19784, dataDir: path.join(temp, 'data'),
+  exe, port: await freePort(19784), dataDir: path.join(temp, 'data'),
   env: { CINCO_ID_CONFIG: 'none', CINCO_ID_OPERATOR: 'Paul', ...(projects ? { CINCO_ID_PROJECTS_DIR: path.resolve(projects) } : {}) },
 }));
 let failed = false;
