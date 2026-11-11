@@ -1,0 +1,43 @@
+{
+  "project": "projects/4d3d3d3",
+  "note": "Invented people only. Seeds are fixed so the pictures can be made again exactly.",
+  "sequences": [
+    {
+      "id": "celery-man",
+      "name": "Celery Man",
+      "seed": 4318,
+      "expressions": [
+        "smiling"
+      ],
+      "prompt": "Celery Man: an ordinary, slightly awkward office worker in his thirties with short neat hair, wearing a baggy grey early-1990s suit with big shoulders, a white shirt, a celery-green tie and sensible brown shoes. Dance: an earnest side-to-side office-party shuffle, stepping left and right with stiff arms and a shy, concentrated face"
+    },
+    {
+      "id": "oyster",
+      "name": "Oyster",
+      "seed": 2208,
+      "expressions": [
+        "smiling"
+      ],
+      "prompt": "Oyster: a cheerful person in their late twenties wearing a shiny pearl-grey satin shirt, dark slacks, black shoes and a pearl necklace. Dance: a smooth, happy groove, swaying the hips and shoulders and snapping the fingers"
+    },
+    {
+      "id": "tayne",
+      "name": "Tayne",
+      "seed": 9002,
+      "expressions": [
+        "smiling"
+      ],
+      "prompt": "Tayne: a flamboyant stage entertainer in his forties wearing a sparkly teal sequinned jumpsuit, white boots and a very large wide-brimmed dark navy hat sitting clearly on top of his head. Dance: a confident strut on the spot, swinging the hips and rolling the shoulders"
+    },
+    {
+      "id": "tayne/nude",
+      "name": "Tayne (costume)",
+      "seed": 9002,
+      "expressions": [],
+      "prompt": "Tayne in his silly stage costume: the same flamboyant entertainer, now wearing a baggy, loose-fitting, wrinkled full-body mime costume in plain pale peach skin-coloured cotton (not teal, not shiny) that hangs loosely like oversized pyjamas, covering him from a high round collar down to the wrists and ankles, an obviously cheap theatrical costume with no body shape showing, together with the same white boots and the same very large wide-brimmed dark navy hat sitting on top of his head. Dance: a confident strut on the spot, swinging the hips and rolling the shoulders",
+      "like": "tayne",
+      "likeStrength": 0.72,
+      "likeTint": "#e6c2a0"
+    }
+  ]
+}

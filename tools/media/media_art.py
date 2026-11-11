@@ -133,12 +133,20 @@ def draw(request: dict) -> dict:
     timings["load_picture_model"] = round(time.monotonic() - started, 1)
     seed = int(request["seed"])
     began = time.monotonic()
-    picture = pipe(prompt=request["prompt"], width=PICTURE_WIDTH, height=PICTURE_HEIGHT,
-                   num_inference_steps=ZIMAGE_STEPS, guidance_scale=0.0,
-                   generator=torch.Generator("cuda").manual_seed(seed)).images[0]
+    restyle = ZImageImg2ImgPipeline(**pipe.components)
+    if request.get("base"):
+        # Re-dress an existing character: same person, pose and hat, new outfit.
+        from PIL import Image
+        base = Image.open(io.BytesIO(request["base"])).convert("RGB").resize((PICTURE_WIDTH, PICTURE_HEIGHT))
+        picture = restyle(prompt=request["prompt"], image=base, strength=float(request.get("base_strength", 0.7)),
+                          num_inference_steps=max(ZIMAGE_STEPS, 14), guidance_scale=0.0,
+                          generator=torch.Generator("cuda").manual_seed(seed)).images[0]
+    else:
+        picture = pipe(prompt=request["prompt"], width=PICTURE_WIDTH, height=PICTURE_HEIGHT,
+                       num_inference_steps=ZIMAGE_STEPS, guidance_scale=0.0,
+                       generator=torch.Generator("cuda").manual_seed(seed)).images[0]
     expressions = {}
     if request.get("expressions"):
-        restyle = ZImageImg2ImgPipeline(**pipe.components)
         for name, prompt in request["expressions"].items():
             expressions[name] = restyle(prompt=prompt, image=picture, strength=EXPRESSION_STRENGTH,
                                         num_inference_steps=max(ZIMAGE_STEPS, 14), guidance_scale=0.0,

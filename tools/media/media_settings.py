@@ -72,11 +72,23 @@ LTX_PACKAGES = (
 )
 
 # --- Canvas, timing and look --------------------------------------------------
+# Everything is 3:4 portrait, the closest shape Seedance 2.5 offers to a dancer.
 FPS = 24
-MOTION_WIDTH, MOTION_HEIGHT = 640, 960        # LTX two-stage canvas (both divisible by 64)
+KEYFRAME_WIDTH, KEYFRAME_HEIGHT = 834, 1112    # keyframe.png: the cut-out at Seedance 720p size
+MOTION_WIDTH, MOTION_HEIGHT = 768, 1024        # LTX two-stage canvas (both divisible by 64)
 MOTION_FRAMES = 97                             # 8n+1; last frame repeats the first pose
-OUTPUT_WIDTH, OUTPUT_HEIGHT = 480, 720         # final clip and stills
-PICTURE_WIDTH, PICTURE_HEIGHT = 832, 1248      # Z-Image drawing size (2:3)
+OUTPUT_WIDTH, OUTPUT_HEIGHT = 540, 720         # final clip and stills
+PICTURE_WIDTH, PICTURE_HEIGHT = 960, 1280      # Z-Image drawing size (3:4)
+
+# --- Dance engine 2: Seedance 2.5 through OpenRouter (paid per clip, owner's key) ---
+OPENROUTER_API = "https://openrouter.ai/api/v1"
+SEEDANCE_MODEL = "bytedance/seedance-2.5"
+SEEDANCE_SECONDS = 5
+SEEDANCE_SIZES = {"480p": "560x752", "720p": "834x1112"}   # 3:4 portrait sizes in the catalogue
+SEEDANCE_PRICE_SKU = "video_tokens_without_audio"
+SEEDANCE_FPS = 24                                          # used for the video-token count
+# Catalogue price read 2026-11-11 (USD per video token); the live catalogue is checked before use.
+SEEDANCE_PRICE_READ = {"date": "2026-11-11", "usdPerVideoToken": "0.0000107"}
 FIGURE_HEIGHT_SHARE = 0.76                     # figure height as share of the canvas
 FIGURE_MAX_WIDTH_SHARE = 0.80
 FEET_LINE = 0.92                               # where the feet stand, from the top
@@ -121,11 +133,19 @@ PREPARE_RATE = rate_per_second(None, PREPARE_CPU, PREPARE_MEMORY_MIB)
 WORST_CASE_USD = round(240 * ART_RATE + 420 * MOTION_RATE + 240 * ART_RATE, 2)
 
 
-def model_records() -> list[dict]:
-    """Model list written into media.json provenance."""
-    return [
+def model_records(engine: str = "ltx") -> list[dict]:
+    """Model list written into media.json provenance (pinned open weights only)."""
+    records = [
         {"repo": ZIMAGE_REPO, "revision": ZIMAGE_REVISION, "license": ZIMAGE_LICENSE, "role": "character picture"},
-        {"repo": LTX_REPO, "revision": LTX_REVISION, "license": LTX_LICENSE, "role": "dance motion",
-         "code": f"{LTX_CODE_REPOSITORY}@{LTX_CODE_REVISION}"},
         {"repo": BIREFNET_REPO, "revision": BIREFNET_REVISION, "license": BIREFNET_LICENSE, "role": "background removal"},
     ]
+    if engine == "ltx":
+        records.insert(1, {"repo": LTX_REPO, "revision": LTX_REVISION, "license": LTX_LICENSE, "role": "dance motion",
+                           "code": f"{LTX_CODE_REPOSITORY}@{LTX_CODE_REVISION}"})
+    return records
+
+
+def seedance_record(canonical_slug: str) -> dict:
+    """Hosted dance model: no downloadable weights, so it is recorded by its dated catalogue name."""
+    return {"service": "OpenRouter", "model": SEEDANCE_MODEL, "version": canonical_slug, "role": "dance motion",
+            "weights": "hosted by ByteDance, not downloadable"}

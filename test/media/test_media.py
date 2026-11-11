@@ -237,8 +237,9 @@ class CommandLineTests(unittest.TestCase):
 
     def test_prompts_mention_backdrop_and_loop(self):
         prompts = generate.build_prompts("Tayne", "A dancer in a hat. Dance: strut.", "magenta", ["smiling"])
-        self.assertIn("grey studio background", prompts["image"])
-        self.assertIn("magenta backdrop", prompts["motion"])
+        self.assertIn("grey studio backdrop", prompts["image"])
+        self.assertIn("invented person", prompts["image"])
+        self.assertIn("magenta studio backdrop", prompts["motion"])
         self.assertIn("same pose", prompts["motion"].replace("exactly the pose", "same pose"))
         self.assertIn("smiling", prompts["expression:smiling"])
 

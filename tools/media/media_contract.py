@@ -81,7 +81,11 @@ def validate_media_dict(media: dict) -> list[str]:
         if key not in provenance:
             problems.append(f"provenance.{key} is missing")
     for model in provenance.get("models", []):
-        if not isinstance(model, dict) or "/" not in str(model.get("repo", "")) or \
+        hosted = isinstance(model, dict) and "service" in model
+        if hosted:
+            if not model.get("model") or not model.get("version"):
+                problems.append("a hosted model needs its model name and dated version")
+        elif not isinstance(model, dict) or "/" not in str(model.get("repo", "")) or \
                 not _REVISION.fullmatch(str(model.get("revision", ""))):
             problems.append("each model needs a publisher/model repo and a pinned 40-character revision")
     prompts = provenance.get("prompts", {})
