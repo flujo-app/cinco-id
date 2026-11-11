@@ -51,7 +51,8 @@
       "LICENSE",
       "!**/__pycache__/**",
       "!**/*.pyc",
-      "!**/.local/**"
+      "!**/.local/**",
+      "!docs/*.mp4"
     ],
     "win": {
       "target": [
