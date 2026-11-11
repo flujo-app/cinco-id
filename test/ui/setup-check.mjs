@@ -26,6 +26,7 @@ const dataDir = path.join(temp, 'data');
 const standIn = path.join(temp, 'stand-in');
 const NAME = 'Ingrid';
 const VOICE = 'Microsoft Zira Desktop';
+const FAKE_KEY = 'sk-or-made-up-for-a-test-0000';
 
 // The stand-in for Modal: "python -m modal setup" prints what the real sign-in prints when it
 // worked; anything else that touches it (the dancer tools) fails at once.
@@ -108,6 +109,8 @@ try {
   console.log(`"Prepare" after Yes (stand-in): ${prepared.message}`);
   assert.equal(prepared.ok, false, 'with the stand-in the dancer tools stop at once');
   assert.match(prepared.message, /stand-in/, 'and say why, in plain words');
+  // A made-up key (not a real one), to check that the real Windows encryption stores it.
+  await setup.locator('input[name=openrouterKey]').fill(FAKE_KEY);
   await next();
 
   // 5. Finish
@@ -123,6 +126,13 @@ try {
   assert.deepEqual(file.voice.tts, { engine: 'windows', voice: VOICE });
   assert.equal(file.media.python, path.normalize(python));
   console.log(`Settings file written: ${path.join(dataDir, 'harness.config.json')}`);
+  const sealed = await fs.readFile(path.join(dataDir, '.local', 'secrets.json'), 'utf8');
+  const onDisk = JSON.stringify(file) + sealed;
+  assert.ok(!onDisk.includes(FAKE_KEY) && !onDisk.includes(Buffer.from(FAKE_KEY).toString('base64')), 'the key is not readable on disk');
+  const shownKeys = await page.evaluate(() => fetch('/api/settings').then(r => r.text()));
+  assert.ok(!shownKeys.includes(FAKE_KEY), 'the key is never sent back to the screen');
+  assert.equal(JSON.parse(shownKeys).secrets.openrouter.source, 'stored');
+  console.log('The made-up OpenRouter key was stored encrypted and is not shown again.');
   await setup.locator('button[data-role=close]').click();
   await page.waitForFunction(name => [...document.querySelectorAll('.console-log .computer')].some(line => new RegExp(`^Good \\w+, ${name}\\.`).test(line.textContent)), NAME, { timeout: 8000 });
   console.log(`Greeting: ${await page.locator('.console-log .computer').last().textContent()}`);

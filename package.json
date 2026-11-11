@@ -4,6 +4,8 @@
   "private": true,
   "productName": "CINCO ID",
   "license": "MIT",
+  "author": "flujo-app",
+  "homepage": "https://github.com/flujo-app/cinco-id",
   "type": "module",
   "description": "Cinco Identity Generator 2.5: a talking Win95-style computer that loads dancing sequences, opens far too many windows and can do real work.",
   "main": "src/shell/main.js",
@@ -13,7 +15,10 @@
     "serve": "node src/server/main.js",
     "test": "node --test \"test/*.test.js\"",
     "test:ui": "node test/ui/run.mjs",
-    "whatsapp:link": "node src/server/events/link-whatsapp.js"
+    "whatsapp:link": "node src/server/events/link-whatsapp.js",
+    "icon": "node tools/icon/make-icon.mjs",
+    "pack": "electron-builder --win --x64 --dir --publish never",
+    "dist": "electron-builder --win --x64 --publish never"
   },
   "engines": {
     "node": ">=22"
@@ -24,6 +29,55 @@
   },
   "devDependencies": {
     "electron": "^45.3.0",
+    "electron-builder": "^26.18.0",
     "playwright-core": "^1.65.0"
+  },
+  "build": {
+    "appId": "app.flujo.cinco-id",
+    "productName": "CINCO ID",
+    "copyright": "Copyright (c) 2026 flujo-app",
+    "asar": false,
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "package.json",
+      "src/**/*",
+      "projects/**/*",
+      "tools/media/**/*",
+      "docs/**/*",
+      "README.md",
+      "LICENSE",
+      "!**/__pycache__/**",
+      "!**/*.pyc",
+      "!**/.local/**"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "CINCO ID",
+      "uninstallDisplayName": "CINCO ID",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "deleteAppDataOnUninstall": false,
+      "include": "build/installer.nsh",
+      "artifactName": "CINCO-ID-Setup-${version}.${ext}"
+    }
   }
 }
