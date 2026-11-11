@@ -95,7 +95,7 @@ export class Connectors extends EventEmitter {
     const attempt = (async () => {
       clearTimeout(this.timers.get(name));
       this.timers.delete(name);
-      const client = new Client({ name: 'cinco-id', version: '2.5.1' });
+      const client = new Client({ name: 'cinco-id', version: '2.5.2' });
       try {
         await client.connect(this.transportFor(spec, name));
         const { tools } = await client.listTools();

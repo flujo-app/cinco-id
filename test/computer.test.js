@@ -164,6 +164,20 @@ test('it is a general tool, not only the routine', async () => {
   assert.equal(computer.windows.size, 0);
 });
 
+test('more disco means more disco, however it is spelled', async () => {
+  const { computer, actions, lastSaid } = await boot();
+  const music = () => actions.filter(action => action.type === 'music').at(-1);
+  await computer.hear('disco');
+  assert.deepEqual(music(), { type: 'music', on: true, more: false });
+  await computer.hear('Computer, mooooore discooooo please!');
+  assert.deepEqual(music(), { type: 'music', on: true, more: true });
+  assert.equal(lastSaid(), 'Yes.');
+  await computer.hear('give me more disco music');
+  assert.equal(music().more, true);
+  await computer.hear('stop the disco');
+  assert.deepEqual(music(), { type: 'music', on: false, more: false });
+});
+
 test('the window limit holds no matter how often it is kicked up', async () => {
   const { computer } = await boot({ config: { maxWindows: 40 } });
   for (let i = 0; i < 5; i++) await computer.hear('kick up the 4d3d3d3');

@@ -1,4 +1,4 @@
-// All sound is made on the spot: beeps, the phone ring, the printer, the lounge music and
+// All sound is made on the spot: beeps, the phone ring, the printer, the disco music and
 // the queue for the computer's voice. No sound files needed.
 
 let context = null;
@@ -86,31 +86,134 @@ export function play(name) {
   try { SOUNDS[name]?.(); } catch { /* sound is a nicety */ }
 }
 
-// ---------- lounge music: a small looping band ----------
+// ---------- disco music: a small looping band ----------
+// An original eight-bar disco groove, played by the app itself: four-on-the-floor kick, claps on
+// two and four, open hi-hats on the off-beats, an octave-jumping bass, choppy rhythm chords, a
+// string pad with a rising run at the end of the phrase, a little hook and the odd "pew" drum.
 
-const CHORDS = [
-  [261.63, 329.63, 392.0, 493.88], // C major 7
-  [220.0, 261.63, 329.63, 392.0], // A minor 7
-  [293.66, 349.23, 440.0, 523.25], // D minor 7
-  [196.0, 246.94, 293.66, 349.23], // G 7
+const TEMPO = 122;
+const MUSIC_LEVEL = 1.25; // how loud the band is; it steps back while the computer speaks
+const STEP = 60 / TEMPO / 4; // one sixteenth note, in seconds
+const hz = note => 440 * 2 ** ((note - 69) / 12); // note numbers as on a piano keyboard, 69 = concert A
+// One chord per bar: A minor 7, D minor 7, G 7, C major 7. `bass` is the root, `tones` the chord.
+const BARS = [
+  { bass: 45, tones: [57, 60, 64, 67] },
+  { bass: 38, tones: [57, 60, 62, 65] },
+  { bass: 43, tones: [55, 59, 62, 65] },
+  { bass: 36, tones: [55, 59, 60, 64] },
 ];
-const LEAD = [523.25, 587.33, 659.25, 783.99, 880.0, 1046.5];
+const HOOK = { // bar of the eight-bar phrase -> { step in the bar: note }
+  0: { 0: 76, 3: 79, 6: 81, 10: 79 },
+  2: { 0: 74, 3: 77, 6: 79, 11: 74 },
+  4: { 0: 76, 3: 79, 6: 81, 8: 84, 11: 81 },
+  6: { 0: 74, 3: 77, 6: 79 },
+};
+const STRING_RUN = [69, 71, 72, 74, 76, 79, 81, 84]; // the rising run in the last half of bar eight
 let musicTimer = null;
 let musicStep = 0;
 let nextStepTime = 0;
 let musicOn = false;
 
+/** One or more notes through a filter: the bass, the rhythm chords, the strings and the hook. */
+function synth(notes, start, length, { type = 'sawtooth', volume = 0.05, filter = 'lowpass', cutoff = 1200, cutoffTo = null, q = 1, attack = 0.005, detune = 0 } = {}) {
+  const ctx = audio();
+  const biquad = ctx.createBiquadFilter();
+  biquad.type = filter;
+  biquad.Q.value = q;
+  biquad.frequency.setValueAtTime(cutoff, start);
+  if (cutoffTo) biquad.frequency.exponentialRampToValueAtTime(cutoffTo, start + length);
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0, start);
+  gain.gain.linearRampToValueAtTime(volume, start + attack);
+  gain.gain.setValueAtTime(volume, start + Math.max(attack, length * 0.6));
+  gain.gain.exponentialRampToValueAtTime(0.0008, start + length);
+  biquad.connect(gain).connect(musicGain);
+  for (const note of [].concat(notes)) {
+    for (const cents of detune ? [-detune, detune] : [0]) {
+      const oscillator = ctx.createOscillator();
+      oscillator.type = type;
+      oscillator.frequency.setValueAtTime(hz(note), start);
+      oscillator.detune.value = cents;
+      oscillator.connect(biquad);
+      oscillator.start(start);
+      oscillator.stop(start + length + 0.03);
+    }
+  }
+}
+
 function scheduleStep(step, time) {
-  const beat = 60 / 108 / 2; // eighth notes
-  const chord = CHORDS[Math.floor(step / 8) % CHORDS.length];
-  const inBar = step % 8;
-  if (inBar === 0 || inBar === 3 || inBar === 6) tone(chord[0] / 2, time, beat * 1.6, { type: 'triangle', volume: 0.2, to: musicGain });
-  if (inBar === 2 || inBar === 5 || inBar === 7) for (const f of chord.slice(1)) tone(f, time, beat * 0.7, { type: 'sawtooth', volume: 0.028, to: musicGain });
-  noise(time, 0.04, { volume: inBar % 2 ? 0.05 : 0.025, frequency: 8000, q: 0.7, to: musicGain });
-  if (inBar === 2 || inBar === 6) noise(time, 0.12, { volume: 0.06, frequency: 1800, q: 0.8, to: musicGain });
-  // a wandering lead line that repeats every 32 steps, so it feels composed rather than random
-  const pick = (Math.imul(step % 32, 2654435761) >>> 0) % 11;
-  if (pick < LEAD.length && inBar !== 0) tone(LEAD[pick], time, beat * 1.4, { type: 'square', volume: 0.035, to: musicGain });
+  const inBar = step % 16;
+  const barInPhrase = Math.floor(step / 16) % 8;
+  const bar = BARS[barInPhrase % BARS.length];
+
+  // drums
+  if (inBar % 4 === 0) { // the kick on every beat
+    tone(150, time, 0.24, { type: 'sine', volume: 0.5, to: musicGain, slideTo: 46 });
+    noise(time, 0.012, { volume: 0.1, frequency: 3500, q: 0.6, to: musicGain });
+  }
+  if (inBar === 4 || inBar === 12) { // the clap on two and four
+    for (const late of [0, 0.011, 0.023]) noise(time + late, 0.05, { volume: 0.2, frequency: 1500, q: 0.9, to: musicGain });
+    noise(time + 0.03, 0.14, { volume: 0.11, frequency: 1300, q: 0.7, to: musicGain });
+  }
+  noise(time, 0.03, { volume: inBar % 2 ? 0.07 : 0.1, frequency: 9500, q: 0.6, to: musicGain }); // ticking hi-hat
+  if (inBar % 4 === 2) noise(time, 0.17, { volume: 0.2, frequency: 8500, q: 0.5, to: musicGain }); // open hi-hat off the beat
+  if ((barInPhrase === 3 && inBar === 14) || (barInPhrase === 7 && inBar === 6)) {
+    tone(900, time, 0.28, { type: 'sine', volume: 0.2, to: musicGain, slideTo: 170 }); // "pew"
+  }
+
+  // bass: root on the beat, an octave up between the beats, a little walk into the next bar
+  if (inBar % 2 === 0) {
+    const up = inBar % 4 === 2;
+    synth(bar.bass + (up ? 12 : 0), time, STEP * (up ? 1.3 : 1.7), { volume: 0.24, cutoff: up ? 900 : 650, cutoffTo: 180, q: 3 });
+  }
+  if (inBar === 15) synth(bar.bass + 7, time, STEP * 0.9, { volume: 0.18, cutoff: 800, cutoffTo: 200, q: 3 });
+
+  // choppy rhythm chords with a moving "wah"
+  if ([3, 6, 7, 11, 14].includes(inBar)) {
+    const wah = 1100 + 900 * Math.sin((step / 16) * Math.PI);
+    synth(bar.tones, time, STEP * (inBar === 7 ? 0.5 : 0.75), { volume: 0.07, filter: 'bandpass', cutoff: Math.max(500, wah), q: 2.5 });
+  }
+
+  // strings: a pad through each bar, and the rising run that leads back to the start
+  if (inBar === 0) synth(bar.tones.slice(1).map(note => note + 12), time, STEP * 15.5, { volume: 0.03, cutoff: 2400, attack: 0.09, detune: 7 });
+  if (barInPhrase === 7 && inBar >= 8) synth(STRING_RUN[inBar - 8] + 12, time, STEP * 1.4, { volume: 0.09, cutoff: 3200, attack: 0.012, detune: 6 });
+
+  // the hook
+  const note = HOOK[barInPhrase]?.[inBar];
+  if (note) synth(note, time, STEP * 2.2, { type: 'square', volume: 0.09, cutoff: 2600, cutoffTo: 900, q: 1.5 });
+
+  // a string stab on the last off-beat of every bar
+  if (inBar === 14) synth(bar.tones.map(tone => tone + 12), time, STEP * 1.2, { volume: 0.045, cutoff: 3000, attack: 0.008, detune: 8 });
+
+  // "More disco" adds layers.
+  if (discoLevel >= 2) {
+    if ([0, 3, 6, 10, 12].includes(inBar)) { // cowbell
+      tone(800, time, 0.09, { type: 'square', volume: 0.07, to: musicGain });
+      tone(540, time, 0.09, { type: 'square', volume: 0.05, to: musicGain });
+    }
+    if (note) synth(note + 12, time, STEP * 1.6, { type: 'square', volume: 0.05, cutoff: 3600, cutoffTo: 1400, q: 1.2 }); // the hook, doubled higher
+  }
+  if (discoLevel >= 3) {
+    // a busy clavinet-like line between the beats
+    if (inBar % 2 === 1 || inBar === 8) synth(bar.tones[(inBar * 7) % 4] - 12, time, STEP * 0.55, { type: 'square', volume: 0.06, filter: 'bandpass', cutoff: 1500, q: 3 });
+    // extra claps into every fourth bar, and a rising whoop back to the top of the phrase
+    if (barInPhrase % 4 === 3 && (inBar === 13 || inBar === 15)) noise(time, 0.05, { volume: 0.18, frequency: 1500, q: 0.9, to: musicGain });
+    if (barInPhrase === 7 && inBar === 12) tone(300, time, STEP * 4, { type: 'sine', volume: 0.16, to: musicGain, slideTo: 1800 });
+  }
+}
+
+let discoLevel = 1; // 1 to 3; every "more disco" adds a layer and a little volume
+const musicLevel = () => MUSIC_LEVEL * (1 + 0.12 * (discoLevel - 1));
+
+/** One more layer of disco, up to the maximum. Returns the level now playing. */
+export function moreDisco() {
+  discoLevel = Math.min(3, discoLevel + 1);
+  if (musicOn && musicGain) {
+    const ctx = audio();
+    musicGain.gain.cancelScheduledValues(ctx.currentTime);
+    musicGain.gain.linearRampToValueAtTime(musicLevel(), ctx.currentTime + 0.3);
+  }
+  return discoLevel;
 }
 
 export function music(on) {
@@ -118,16 +221,16 @@ export function music(on) {
   if (on === musicOn) return;
   musicOn = on;
   musicGain.gain.cancelScheduledValues(ctx.currentTime);
-  musicGain.gain.linearRampToValueAtTime(on ? 0.55 : 0, ctx.currentTime + 0.6);
+  musicGain.gain.linearRampToValueAtTime(on ? musicLevel() : 0, ctx.currentTime + 0.6);
   if (on && !musicTimer) {
     nextStepTime = ctx.currentTime + 0.1;
+    musicStep = 0; // always start at the top of the phrase
     musicTimer = setInterval(() => {
-      const beat = 60 / 108 / 2;
       while (nextStepTime < audio().currentTime + 0.25) {
         scheduleStep(musicStep++, nextStepTime);
-        nextStepTime += beat;
+        nextStepTime += STEP;
       }
-    }, 80);
+    }, 60);
   } else if (!on && musicTimer) {
     setTimeout(() => { if (!musicOn) { clearInterval(musicTimer); musicTimer = null; } }, 700);
   }
@@ -139,7 +242,7 @@ function duck(down) {
   if (!musicGain || !musicOn) return;
   const ctx = audio();
   musicGain.gain.cancelScheduledValues(ctx.currentTime);
-  musicGain.gain.linearRampToValueAtTime(down ? 0.16 : 0.55, ctx.currentTime + 0.25);
+  musicGain.gain.linearRampToValueAtTime(down ? musicLevel() * 0.28 : musicLevel(), ctx.currentTime + 0.25);
 }
 
 // ---------- the voice ----------
