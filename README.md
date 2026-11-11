@@ -106,7 +106,7 @@ from this PC.
 - It listens on this PC only. Web pages open in your browser cannot give it orders.
 - Outside events must be signed with the shared secret.
 - The brain cannot read files or run programs. It only gets the screen tools and the outside tools you list.
-- The cast is invented people. No real people's faces or likenesses, and nothing explicit: the "nude" variant is a skin-tone stage bodysuit with a hat (the drawn stand-in is a shop mannequin).
+- The cast is invented people. No real people's faces or likenesses, and nothing explicit: the "nude" variant is a lime-green mankini with the hat and boots.
 
 ## Tests
 

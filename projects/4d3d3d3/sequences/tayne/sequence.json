@@ -13,8 +13,8 @@
   "variants": {
     "nude": {
       "gated": true,
-      "description": "The same performer in a seamless skin-tone stage bodysuit, still wearing the hat and boots. A silly costume, nothing explicit.",
-      "puppet": { "style": { "suit": null, "sparkle": false, "mannequin": true, "shoes": "#f4f4f4" } }
+      "description": "The same performer in a lime-green sling swimsuit (a mankini), still wearing the hat and boots. A silly beach costume, nothing explicit.",
+      "puppet": { "style": { "suit": null, "sparkle": false, "mankini": "#9be22a", "shoes": "#f4f4f4" } }
     }
   }
 }

@@ -108,7 +108,8 @@ test('the whole routine from the sketch works line by line', async () => {
   await computer.hear('Mmm... mm-hmm.');
   assert.equal(windows('dialog').length, 0);
   assert.equal(tayne()[0].sequence.variant, 'nude');
-  assert.equal(tayne()[0].sequence.puppet.style.mannequin, true);
+  assert.equal(tayne()[0].sequence.puppet.style.mankini, '#9be22a');
+  assert.equal(tayne()[0].sequence.puppet.style.hat, 'wide', 'the hat stays on');
 });
 
 test('saying no at the gate changes nothing', async () => {

@@ -83,7 +83,7 @@ try {
   await picture('are-you-sure');
   await say('Mmm... mm-hmm.', 'Generating.', 2200);
   assert.equal(await count('.window.kind-dialog'), 0, 'the dialog is gone');
-  await picture('mannequin');
+  await picture('variant');
 
   await say('test call from my wife', null, 700);
   assert.equal(await count('.window.kind-call'), 1, 'an incoming call window');
