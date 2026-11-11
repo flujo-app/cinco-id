@@ -684,7 +684,7 @@ async function openFolder(which) {
     if (problem) logLine('system', `Could not open the folder: ${problem}`);
     return;
   }
-  wm.open({ id: `folder-${which}-${Date.now()}`, kind: 'note', title: which === 'projects' ? 'Projects folder' : 'Printouts folder', text: where ?? 'Unknown.' }, { instant: true });
+  wm.open({ id: `folder-${which}-${Date.now()}`, kind: 'note', title: `${which[0].toUpperCase()}${which.slice(1)} folder`, text: where ?? 'Unknown.' }, { instant: true });
 }
 
 const micTray = document.getElementById('tray-mic');

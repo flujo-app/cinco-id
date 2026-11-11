@@ -162,7 +162,7 @@ async function start() {
   // The Start menu on the screen can open the projects and printouts folders. Only these fixed
   // folders: the screen names one, it never hands over a path.
   ipcMain.handle('open-folder', async (_event, which) => {
-    const folders = { projects: harness?.config.projectsDir, printouts: harness?.config.printouts.dir, data: harness?.config.dataDir };
+    const folders = { projects: harness?.config.projectsDir, printouts: harness?.config.printouts.dir, music: harness?.config.musicDir, data: harness?.config.dataDir };
     const folder = folders[which];
     if (!folder) return 'There is no such folder.';
     await fs.mkdir(folder, { recursive: true });

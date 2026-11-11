@@ -281,3 +281,25 @@ test('the brain uses the screen tools, and outside tools need a Yes first', asyn
     assert.equal(app.computer.log.at(-1).text, 'Sent.');
   } finally { await stop(); }
 });
+
+test('your own music: sound files in the music folder are listed in name order and served', async () => {
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'cinco-id-own-music-'));
+  const musicDir = path.join(temp, 'music');
+  await fs.mkdir(musicDir, { recursive: true });
+  await fs.writeFile(path.join(musicDir, '2 second.mp3'), 'two');
+  await fs.writeFile(path.join(musicDir, '1 first.ogg'), 'one');
+  await fs.writeFile(path.join(musicDir, 'notes.txt'), 'not music');
+  const { app, base, stop } = await start({ overrides: { musicDir } });
+  try {
+    assert.ok(app);
+    const empty = await start({ overrides: { musicDir: path.join(temp, "none") } });
+    try { assert.deepEqual(await (await fetch(`${empty.base}/api/music`)).json(), { files: [] }); } finally { await empty.stop(); }
+    const { files } = await (await fetch(`${base}/api/music`)).json();
+    assert.deepEqual(files, ['/music/1%20first.ogg', '/music/2%20second.mp3']);
+    const first = await fetch(`${base}${files[0]}`);
+    assert.equal(first.headers.get('content-type'), 'audio/ogg');
+    assert.equal(await first.text(), 'one');
+    assert.equal((await fetch(`${base}/music/notes.txt`)).status, 404);
+    assert.equal((await fetch(`${base}/music/..%2F..%2Fpackage.json`)).status, 403);
+  } finally { await stop(); await fs.rm(temp, { recursive: true, force: true }); }
+});

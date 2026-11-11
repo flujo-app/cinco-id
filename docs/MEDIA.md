@@ -139,7 +139,6 @@ python tools/media/generate.py --name "Tayne" --prompt "..." --out <folder> --en
 | Dance (default) | [`Lightricks/LTX-2.5`](https://huggingface.co/Lightricks/LTX-2.5) with code [`Lightricks/LTX-2`](https://github.com/Lightricks/LTX-2) at `a95ab856bf29407b6b066ede0abe1846050db56c` | `5e6e71018ee1756ed329b697a7b4aedc934dfce9` | LTX-2.x Community License: free for people and companies under USD 10M yearly revenue and for hobby use; published outputs must be marked as machine-made |
 | Dance (option) | [`Wan-AI/Wan2.2-I2V-A14B-Diffusers`](https://huggingface.co/Wan-AI/Wan2.2-I2V-A14B-Diffusers) | `596658fd9ca6b7b71d5057529bbf319ecbc61d74` | Apache-2.0 |
 | Dance (option) | [`MiniMaxAI/MiniMax-H3`](https://huggingface.co/MiniMaxAI/MiniMax-H3), folder `FL2VA`, run with the official SGLang image `lmsysorg/sglang@sha256:b1259f3ea3275f66237c498ea388919729018bc9f01c3d638391e06e2cf3f469` | `0919fb684102ef115126612f3fbb84d1027e7317` | [MiniMax H3 Community License Agreement](https://huggingface.co/MiniMaxAI/MiniMax-H3/blob/0919fb684102ef115126612f3fbb84d1027e7317/LICENSE) (accepted by the owner) |
-| Music | [`ACE-Step/acestep-v15-xl-turbo-diffusers`](https://huggingface.co/ACE-Step/acestep-v15-xl-turbo-diffusers), run with `diffusers` 0.42.1 (see "Music" below) | `200ba991ae448051e14b0183157e35c2d27c9fb0` | MIT (its text encoder, Qwen3-Embedding-0.6B, Apache-2.0) |
 
 All weights come from the publisher's or author's own account. Every large file is checked against its published
 SHA-256 checksum when it is downloaded (Wan's 30 files are listed in `tools/media/wan_files.json`, LTX's six in
@@ -180,7 +179,6 @@ stranger's path on his own account without touching his cache.
 | `beta-sequence-ltx-weights` | LTX-2.5, only on accounts without the owner's cache | 74.5 GiB (the six pinned files) |
 | `beta-sequence-h3-weights` | MiniMax H3, only if prepared on an account without the owner's copy | 134.2 GiB (the 81 pinned files) |
 | `savia-spot-minimax-h3-42ed227e` | MiniMax H3 on the owner's account; belongs to another project, only read | 134.2 GiB (not ours, not counted below) |
-| `beta-sequence-music-weights` | ACE-Step 1.5 XL Turbo and the singing check, for `make_music.py` | 10.4 GiB (11.1 GB model + 80 MB check) |
 
 **Price** ([modal.com/pricing](https://modal.com/pricing), read 2026-11-11): stored files cost $0.09 per GiB per month,
 and the **first 1 TiB per month is free** for the whole Modal workspace. So these volumes cost **nothing** while the
@@ -198,7 +196,6 @@ modal volume delete beta-sequence-wan-weights      # Wan2.2
 modal volume delete beta-sequence-art-weights      # picture and cut-out models
 modal volume delete beta-sequence-ltx-weights      # LTX-2.5 (only if you prepared your own)
 modal volume delete beta-sequence-h3-weights       # MiniMax H3 (only if you prepared your own)
-modal volume delete beta-sequence-music-weights    # the music model (only needed to make new music)
 ```
 
 Never delete `morriton-ltx-2-5-model-cache` or `savia-spot-minimax-h3-42ed227e`: they belong to other projects.
@@ -455,112 +452,15 @@ All measured by the tool. No download, no software build (the cloud software was
 | | Beach costume, second take ("stay low" wording; it hardly moved, so it was dropped) | $0.526 |
 | **Total** | | **$2.33** |
 
-## Music
-
-The disco music is three real-sounding loops, one per disco level, in `src/ui/music/`. "Disco" starts level 1
-(a tight groove), "more disco" blends into level 2 (bigger: strings and brass) and then level 3 (full-on: everything,
-busier, more percussion). The three loops have the same tempo and the same length, so the blend (about one second)
-stays on the beat. If the loops are missing or cannot be played, the app plays its old groove made on the spot
-instead, without an error. `src/ui/music/music.json` lists every loop with its tempo, length, loudness, prompt,
-seed and the exact model it was made with.
-
-### Which music model, and why
-
-Compared on 2026-11-11, by licence first (the loops ship inside this MIT-licensed public repository and anyone
-may use the app), then by reported quality for instrumental groove music, then by how easy it is to run on Modal.
-
-| Model | Licence of the weights | Good for instrumental disco? | Running it | Verdict |
-|---|---|---|---|---|
-| **ACE-Step 1.5 XL Turbo** (`ACE-Step/acestep-v15-xl-turbo-diffusers`, April 2026) | **MIT**; the model card says the music may be used commercially | Its makers and independent reviews put ACE-Step 1.5 between Suno v4.5 and v5; the XL model has a larger music part for better sound. Takes a style text, a fixed tempo, key and time signature, and `[Instrumental]` for no singing | Official Diffusers release from the makers' own account; runs with the normal `diffusers` package; seconds per track on one card | **Chosen** |
-| MiniMax Music 3 (`MiniMaxAI/MiniMax-Music3`, October 2026) | Own "community licence": products must show "MiniMax-Music3" on screen, and anyone who lets others make music with it must build and run misuse safeguards | Strong on full songs with singing; reviews call its instrumental texture thinner than the best hosted models | About 20 GB (an 8B language model plus a 10 GB sound decoder), its own software | Licence duties do not fit a free MIT app that anyone may change |
-| Stable Audio Open 1.0 / Small (`stabilityai/...`) | Stability AI Community Licence: sign-in and accept first, free only below USD 1M yearly revenue | Trained on freely licensed sound libraries; good for sounds and short loops, weak on full band grooves; 47 s (Small: 11 s) at most | Easy | Licence is not open enough, quality lower for a band groove |
-| YuE (`m-a-p/YuE-...`) | Apache-2.0 | Made for whole songs with singing from lyrics | Two large models, minutes per 30 seconds | Built for vocals, slow |
-| DiffRhythm 1.2 / DiffRhythm 2 (`ASLP-lab/...`) | 1.2 has no licence on its model page; 2 is Apache-2.0 | Made for whole songs with singing; instrumental is a side use | Moderate | Weaker fit for an instrumental groove |
-| Magenta RealTime (`google/magenta-realtime`) | CC-BY-4.0 (credit needed) | Live, steerable music in 2-second pieces; sound quality below the offline models | Made for Google's own chips (JAX) | Lower quality, harder to run |
-| MusicGen (Meta) | CC-BY-NC 4.0 (non-commercial only) | | | Not allowed here |
-| SongGeneration 2 (Tencent) | Weights found only on a personal account with an unclear licence | Songs with singing | | Not an official, pinned source |
-
-### How the loops were made
-
-`tools/media/make_music.py` does everything; `tools/media/music.json` is the recipe (prompts, fixed seeds, tempo
-120, key A minor, 4/4, `[Instrumental]`, the pinned model and its file checksums).
-
-1. Once per Modal account, the model (11.1 GB) is downloaded into our own storage `beta-sequence-music-weights`
-   and every big file is checked against its checksum. A separation model (Demucs v4 "htdemucs", MIT, from its
-   makers' own download server, checked by the hash in its file name) is stored next to it; it is only used to
-   measure how much singing is in a candidate.
-2. One cloud graphics card (L40S) makes four 100-second candidates per level from the style text and seeds, and
-   measures each: tempo and how steady the beat is (beat tracking with librosa, then a straight line through the
-   beats), how strongly the beat stands out, peaks and clipping, near-silences, how much of the sound is bass and
-   how much is treble, and the share the separation model hears as singing.
-3. On this computer, without the cloud: for every candidate the best place for the loop is searched, a whole
-   number of bars (32, or 16 if no good 32-bar stretch exists) that starts on a bar line (where the chords change)
-   and whose last bars sound most like its first bars. Candidates with a wrong tempo, an unsteady beat, silences,
-   singing, thin bass or a dull top end are refused; of the rest the one with the best overall numbers is kept.
-4. The loop is set to exactly 120 BPM (a tiny speed change, if any), and its end is blended into its start over
-   0.12 seconds, finishing just before the first beat, so there is no click or jump. All three loops are set to the
-   same loudness with headroom (-16, -15.5 and -15 LUFS, at least 1 dB below full scale) and saved as Ogg Opus,
-   which Chromium decodes to exactly the right length (no gap at the loop point; MP3 adds silence at the ends).
-5. The seam is checked on the saved file, decoded again: the jump from the last sample to the first is compared
-   with every other step in the loop, and the change in sound across the seam with the change between any two
-   moments of the loop.
-
-```powershell
-python tools/media/make_music.py                      # the plan and its cost; spends nothing
-python tools/media/make_music.py --yes --sample sample.mp3
-python tools/media/make_music.py --from-work <folder> # redo choosing and looping for free
-```
-
-The prompts describe a style only. No song, band or artist is named or imitated, and no recording is used as input.
-
-### The loops in the app (made 2026-11-11)
-
-All three: 120 BPM, A minor (asked for, and confirmed by a key estimate on the finished files), 32 bars = exactly
-64.000 seconds, Ogg Opus at 109 kbit/s, 48 kHz stereo, no clipping. Four candidates were made per level; every
-candidate came out within 1 BPM of 120 (ten of the twelve at 120.0 or 120.1) and the singing check heard no singing in any of them
-(0.02 % at most).
-
-| Level | Seed | Measured tempo | Beat steadiness | Loudness | Highest peak | File size | Cut from the candidate at |
-|---|---|---|---|---|---|---|---|
-| 1, groove | 1971 | 120.0 BPM | 3.9 ms | -16.0 LUFS | -5.4 dBTP | 945 KB | 24.4 s |
-| 2, bigger | 4272 | 120.0 BPM | 4.1 ms | -15.5 LUFS | -4.4 dBTP | 956 KB | 10.6 s |
-| 3, full-on | 4273 | 120.0 BPM | 3.8 ms | -15.0 LUFS | -2.6 dBTP | 962 KB | 14.4 s |
-
-Refused or beaten candidates: level 1 seed 4271 (dull top end), seed 9171 (unsteady beat, 31 ms); level 2 seed
-7772 (121 BPM and a dull top end); the rest had lower overall numbers. Every file decodes back to exactly 3,072,000
-samples (no gap, no padding), in ffmpeg and in the app itself. The seam was measured on the saved files: the step
-from the last sample back to the first is an ordinary step (larger than 68 %, 15 % and 58 % of all steps in the
-loops), and the change in sound across the seam is like that at any other bar line of the same loop (it changes
-more than at 77 %, 81 % and 39 % of the other 31 bar lines). Nothing above about 16 kHz is in the model's sound.
-
-**Nobody has listened to these loops.** They were chosen only by the measurements above. If one sounds wrong,
-pick another candidate by changing the seeds in `tools/media/music.json` and running the tool again.
-
-### Music ledger (2026-11-11, cap $3): about $0.13
-
-Taken from Modal's own billing report for the music app (the tool's own estimate from seconds × price was $0.16).
-
-| What | Steps | Cost |
-|---|---|---|
-| First try | software build failed on a package version clash; fixed | $0.007 |
-| Short test | software build, download and check of the model (11.1 GB, 144 s), one 20-second candidate | $0.047 |
-| The music | 12 candidates of 100 seconds on one L40S (173 s in all), measuring included | $0.074 |
-| **Total** | | **about $0.13** |
-
-Choosing, looping, levelling and saving ran on this computer and cost nothing; it can be redone for free with
-`--from-work`.
-
 ## Tests
 
 ```powershell
 python -m unittest discover -s test/media -v
 ```
 
-The tests need no cloud, no graphics card and no key. `test_music.py` checks the disco-loop maker on a made-up
 groove: tempo line, bar-line start, whole bars at exactly 120 BPM, the 16-bar fallback, refusing bad candidates,
 the cost shown before anything is spent, and an Opus round trip that decodes to exactly the loop's length.
-`npm test` checks the loops in `src/ui/music` against their `music.json`, their size and how the app serves them;
-`node test/ui/music-check.mjs` starts the app silently and checks it plays them (see the Music section). They check the `media.json` contract, the cut-out clean-up
+They check the `media.json` contract, the cut-out clean-up
 (backdrop tint, green halos, blurred hands), the loop step, the hat line, a real ffmpeg round trip that proves the
 see-through background survives VP9 encoding, the choice of dance model per account (owner's cache, own copy,
 only Wan, nothing prepared, Hugging Face sign-in needed, the testing switch), the LTX download's checksum step on
@@ -588,8 +488,3 @@ and failed jobs (never re-sent), the time limit, the spending cap, and prices pe
 | `tools/media/media_finish.py` | Runs locally: cut-out clean-up, layout, loop, VP9 encode, hat line. |
 | `tools/media/media_contract.py` | Builds and checks `media.json` folders. |
 | `tools/media/media_settings.py` | Model pins, canvas sizes, machine sizes and prices. |
-| `tools/media/make_music.py` | Makes the three disco loops: cost first, then cloud candidates, then choosing and looping here. |
-| `tools/media/media_music.py` | The Modal app for the music: storage, software, making and measuring candidates. |
-| `tools/media/music.json` | The music recipe: pinned model and checksums, prompts, seeds, tempo and key. |
-| `src/ui/music/` | The three loops and their `music.json` (tempo, length, loudness, prompt, seed, model). |
-| `test/music.test.js`, `test/ui/music-check.mjs` | Checks the loops and their list, and (silently) that the app plays them. |

@@ -35,8 +35,8 @@ There is also [the same demo with the robot voice](docs/demo-robot-voice.mp4).
   says "I'm afraid I can't do that."
 - **Printouts.** "Give me a printout of Oyster smiling" is a real Windows print job, sent to the PDF printer: a
   photo with a small caption, as in the sketch.
-- **Real disco.** Three disco loops play while anything dances. "More disco" steps up to the next one, twice. They
-  were made with an open music model, and you can make your own.
+- **Disco.** Music plays while anything dances, and "more disco" steps it up, twice. Put your own music files into
+  the music folder and it plays those; otherwise a small band made on the spot plays.
 - **Far too many windows.** Up to 96 at once, in the look of the sketch's computer: whole dancers on white,
   close-ups on pink that follow the head, title cards in big chunky letters, neat piles of windows, about twenty
   effects, and any made-up word becomes its own effect and is remembered. In see-through mode the windows and
@@ -45,7 +45,7 @@ There is also [the same demo with the robot voice](docs/demo-robot-voice.mp4).
 
 ## Install
 
-Download `CINCO-ID-Setup-2.5.3.exe` from the [releases page](https://github.com/flujo-app/cinco-id/releases) and run
+Download `CINCO-ID-Setup-2.5.4.exe` from the [releases page](https://github.com/flujo-app/cinco-id/releases) and run
 it. It installs for your Windows user only and does not need administrator rights. You get a Start menu entry and a
 desktop shortcut; "CINCO ID" in Windows' "Apps" list removes it again (your settings and projects stay in your app
 data folder).
@@ -115,9 +115,8 @@ call, your folders and Setup.
 Everything it can load lives in **projects**. A project is a folder with a hexadecimal name, and each dancer
 ("sequence") is a folder inside it. See [docs/PROJECTS.md](docs/PROJECTS.md) for the layout.
 
-**`4d3d3d3`** is the pre-built demo project, dressed as in the sketch: Celery Man in his baggy silver suit, Oyster
-in the red flame cap and track jacket, the beta sequence Tayne in the black hat, sunglasses and gold-patterned shirt
-(with his gated variant), and the bonus dancer Celery Head. "Kick up the 4d3d3d3" starts it.
+**`4d3d3d3`** is the pre-built demo project: Celery Man, Oyster, the beta sequence Tayne with his gated variant, and
+the bonus dancer Celery Head. "Kick up the 4d3d3d3" starts it.
 
 <img src="projects/d15c0/sequences/grandmother/still.png" alt="A grandmother in a gold tracksuit" width="180" align="right">
 
@@ -133,11 +132,10 @@ the name. The computer works on it in the background, tells you when it has a ne
 you ask "do we have any new sequences?". Until a dancer has a generated clip, a simple drawn puppet stands in, so
 everything also works offline.
 
-**The disco music** is three loops in `src/ui/music/`, made with the open music model ACE-Step 1.5 from a
-description of the style alone (no song, band or artist named). To make your own, change the descriptions in
-`tools/media/music.json` and run `python tools/media/make_music.py`: it shows the cost first (about 10 cents) and
-spends nothing until you add `--yes`. If the loops are missing, a small band made on the spot plays instead.
-[docs/MEDIA.md](docs/MEDIA.md) has the details.
+**Your own music.** Open the Menu, choose "Music folder" and put one to three sound files there (mp3, ogg or wav).
+In name order they become the three disco levels: the first plays for "disco", the next for "more disco", the third
+for "mooooore discooooo". With one file, that one plays throughout. Restart CINCO ID after changing the files.
+With an empty folder, a small band made on the spot plays.
 
 ## Linking your accounts
 
@@ -169,15 +167,13 @@ Running CINCO ID itself costs nothing. The parts that can cost money are your ow
 | One new dancer on Modal with the Wan2.2 model | about $0.80 | longer |
 | One new dancer through OpenRouter | about $0.25 (MiniMax) or $0.53 (Seedance) for a 5-second clip at 480p, from the price list, plus a few cents on Modal | not measured |
 | Preparing a Modal account once | about $0.25 for all three models (about 240 GB, 40 minutes), or about $0.05 for the default dance model alone (80 GB, 10 minutes, estimated) | once |
-| Your own disco loops on Modal (optional; the three that ship cost nothing) | about $0.10 for a full set of three | about 10 minutes |
 
 **Between dancers nothing keeps running**, so there is no hourly cost. The only standing cost is storage for the
 model files on Modal:
 
 - Modal charges $0.09 per GiB per month, and the first 1 TiB per month in a workspace is free
   ([Modal pricing](https://modal.com/pricing), read in November 2026).
-- The picture models take 31 GiB, Wan2.2 takes 118 GiB and your own copy of LTX-2.5 takes 75 GiB. The music
-  model, only there if you make your own disco loops, takes 10 GiB.
+- The picture models take 31 GiB, Wan2.2 takes 118 GiB and your own copy of LTX-2.5 takes 75 GiB.
 - So storage is free while your whole Modal workspace stays under 1 TiB. Above that, all three together would cost
   about $20 a month.
 
@@ -187,7 +183,6 @@ model files on Modal:
 modal volume delete beta-sequence-art-weights
 modal volume delete beta-sequence-wan-weights
 modal volume delete beta-sequence-ltx-weights
-modal volume delete beta-sequence-music-weights
 ```
 
 The drawback is waiting at the next new dancer while the files are fetched again: about 5 minutes and 1 cent for the
@@ -283,7 +278,7 @@ The door only opens with the access token in `.local/mcp-token` in the data fold
 - The brain cannot read files or run programs. It only gets the screen tools and the outside tools you list.
 - Only one copy runs at a time. Quitting while a dancer is being made asks first.
 - The cast is invented people. No real people's faces or likenesses, and nothing explicit: the "nude" variant is a
-  lime-green mankini and two rubber-duck swim rings, with the hat, the sunglasses and the boots.
+  lime-green mankini with the hat and boots.
 
 ## Tests
 
@@ -293,7 +288,7 @@ npm run test:ui                            # starts the real app silently and pl
 node test/ui/setup-check.mjs               # goes through the Setup window like a first start (no money, no browser)
 node test/ui/sturdy-check.mjs              # busy port, second start, quitting while a dancer is made, a broken settings file
 node test/ui/whatsapp-check.mjs            # links WhatsApp with a stand-in connector: Install, QR code, a call, Decline, Unlink
-node test/ui/music-check.mjs               # the three disco loops load, loop and step up (silent)
+node test/ui/music-check.mjs               # your own music files play as the disco levels (silent)
 node test/ui/overlay-check.mjs             # checks the see-through mode on the real desktop (Windows)
 node test/ui/print-check.mjs               # checks that a printout reaches the Windows print system
 node test/ui/clip-check.mjs "Celery Head"  # checks that a generated clip plays see-through

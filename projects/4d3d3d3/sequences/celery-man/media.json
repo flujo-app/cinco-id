@@ -10,7 +10,7 @@
   },
   "hatLine": 0.28,
   "provenance": {
-    "created": "2026-11-11T15:19:48Z",
+    "created": "2026-11-11T06:40:38Z",
     "models": [
       {
         "repo": "Tongyi-MAI/Z-Image-Turbo",
@@ -33,25 +33,25 @@
       }
     ],
     "prompts": {
-      "image": "Celery Man: a slim, clean-shaven man around forty with short dark-brown hair and a confident, slightly smug face, wearing an oversized shiny silver-grey sharkskin suit with a 1980s cut: wide padded shoulders, the jacket worn open, baggy pleated trousers. Under it a plain white dress shirt with a thin, loosened dark-grey tie, a black belt with a silver buckle, and black dress shoes. Dance: cheesy, self-satisfied showman moves to the beat: he pops one hip out, bounces on his knees, pumps both fists up and down by his shoulders and shimmies his shoulders, grinning smugly the whole time. Full-body shot of the whole person from the very top of the head (or hat) down to the shoes, standing upright and facing the camera in a relaxed ready-to-dance pose with the arms a little away from the body, centred with empty space all around, nothing cropped. Plain seamless solid light grey studio backdrop with nothing else in the picture: no props, no text, no logo. Realistic video footage of a real-looking, ordinary, invented person who is not any celebrity or real individual. Early-1990s public-access TV or corporate training tape look: slightly soft analogue video picture, warm colours, bright even studio lighting.",
-      "expression:smiling": "Celery Man: a slim, clean-shaven man around forty with short dark-brown hair and a confident, slightly smug face, wearing an oversized shiny silver-grey sharkskin suit with a 1980s cut: wide padded shoulders, the jacket worn open, baggy pleated trousers. Under it a plain white dress shirt with a thin, loosened dark-grey tie, a black belt with a silver buckle, and black dress shoes. Dance: cheesy, self-satisfied showman moves to the beat: he pops one hip out, bounces on his knees, pumps both fists up and down by his shoulders and shimmies his shoulders, grinning smugly the whole time. Full-body shot of the whole person from the very top of the head (or hat) down to the shoes, standing upright and facing the camera in a relaxed ready-to-dance pose with the arms a little away from the body, centred with empty space all around, nothing cropped. Plain seamless solid light grey studio backdrop with nothing else in the picture: no props, no text, no logo. Realistic video footage of a real-looking, ordinary, invented person who is not any celebrity or real individual. Early-1990s public-access TV or corporate training tape look: slightly soft analogue video picture, warm colours, bright even studio lighting. The person is clearly smiling with a big, warm, happy smile.",
-      "motion": "Celery Man: a slim, clean-shaven man around forty with short dark-brown hair and a confident, slightly smug face, wearing an oversized shiny silver-grey sharkskin suit with a 1980s cut: wide padded shoulders, the jacket worn open, baggy pleated trousers. Under it a plain white dress shirt with a thin, loosened dark-grey tie, a black belt with a silver buckle, and black dress shoes. Dance: cheesy, self-satisfied showman moves to the beat: he pops one hip out, bounces on his knees, pumps both fists up and down by his shoulders and shimmies his shoulders, grinning smugly the whole time. The person dances on the spot in the middle of the frame and finishes the dance back in exactly the pose they started in. The whole body stays in view from head to feet the entire time. Static locked-off camera with no zoom, no pan and no cuts. The background is a plain flat blue studio backdrop that stays perfectly even and still. Realistic early-1990s public-access TV video look. Smooth, rhythmic, slightly goofy dancing. No talking, no text.",
+      "image": "Celery Man: an ordinary, slightly awkward office worker in his thirties with short neat hair, wearing a baggy grey early-1990s suit with big shoulders, a white shirt, a celery-green tie and sensible brown shoes. Dance: an earnest side-to-side office-party shuffle, stepping left and right with stiff arms and a shy, concentrated face. Full-body shot of the whole person from the very top of the head (or hat) down to the shoes, standing upright and facing the camera in a relaxed ready-to-dance pose with the arms a little away from the body, centred with empty space all around, nothing cropped. Plain seamless solid light grey studio backdrop with nothing else in the picture: no props, no text, no logo. Realistic video footage of a real-looking, ordinary, invented person who is not any celebrity or real individual. Early-1990s public-access TV or corporate training tape look: slightly soft analogue video picture, warm colours, bright even studio lighting.",
+      "expression:smiling": "Celery Man: an ordinary, slightly awkward office worker in his thirties with short neat hair, wearing a baggy grey early-1990s suit with big shoulders, a white shirt, a celery-green tie and sensible brown shoes. Dance: an earnest side-to-side office-party shuffle, stepping left and right with stiff arms and a shy, concentrated face. Full-body shot of the whole person from the very top of the head (or hat) down to the shoes, standing upright and facing the camera in a relaxed ready-to-dance pose with the arms a little away from the body, centred with empty space all around, nothing cropped. Plain seamless solid light grey studio backdrop with nothing else in the picture: no props, no text, no logo. Realistic video footage of a real-looking, ordinary, invented person who is not any celebrity or real individual. Early-1990s public-access TV or corporate training tape look: slightly soft analogue video picture, warm colours, bright even studio lighting. The person is clearly smiling with a big, warm, happy smile.",
+      "motion": "Celery Man: an ordinary, slightly awkward office worker in his thirties with short neat hair, wearing a baggy grey early-1990s suit with big shoulders, a white shirt, a celery-green tie and sensible brown shoes. Dance: an earnest side-to-side office-party shuffle, stepping left and right with stiff arms and a shy, concentrated face. The person dances on the spot in the middle of the frame and finishes the dance back in exactly the pose they started in. The whole body stays in view from head to feet the entire time. Static locked-off camera with no zoom, no pan and no cuts. The background is a plain flat blue studio backdrop that stays perfectly even and still. Realistic early-1990s public-access TV video look. Smooth, rhythmic, slightly goofy dancing. No talking, no text.",
       "negative": "camera movement, zoom in, zoom out, pan, tilt, cut, scene change, second person, crowd, text, subtitles, watermark, logo, cropped feet, cropped head, leaving the frame, blurry, distorted body, extra limbs, melting, morphing, flicker, talking"
     },
-    "costUsdEstimate": 0.35,
+    "costUsdEstimate": 0.37,
     "engine": "ltx",
     "seed": 4318,
     "backdropForCutout": "blue",
-    "seconds": 280,
+    "seconds": 254,
     "loop": {
-      "typicalStep": 0.01641,
-      "seamBefore": 0.00329,
+      "typicalStep": 0.00894,
+      "seamBefore": 0.00158,
       "crossfadeFrames": 0,
-      "seamAfter": 0.00329,
+      "seamAfter": 0.00158,
       "frames": 96
     },
-    "clipBytes": 901565,
+    "clipBytes": 524080,
     "machineGenerated": true,
-    "note": "Clip cost: picture 0.03 + dance 0.29 + cut-out 0.06 US dollars (measured; second dance take, kept because it bounces more to the beat; the first take cost 0.31). No hat: hatLine set by hand to just below the chin as measured on the still and clip frames (the automatic estimate, 0.314, fell at the shoulders)."
+    "note": "Clip cost: picture 0.03 + dance 0.31 + cut-out 0.04 US dollars. No hat: hatLine set by hand to just below the chin as measured on the still and clip frames (the automatic estimate, 0.315, fell at the shoulders)."
   }
 }
