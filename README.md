@@ -65,7 +65,10 @@ and is not put into git. Without it, the fixed phrases, puppets, effects and the
 
 - **Your name**: `operator`. The computer addresses you by it.
 - **Voice out**: uses the Voder robot voice if the `voder` project sits next to this folder. Otherwise the
-  voices built into Windows are used.
+  voices built into Windows are used. It can also speak with any voice installed in Windows: set
+  `"engine": "windows", "voice": "Microsoft Zira Desktop"`, or just say "use the Zira voice". Microsoft Sam is not
+  part of Windows 10 or 11. If you install it yourself as a Windows voice, it shows up in the list and can be chosen
+  like any other.
 - **Voice in**: needs a Python that has `faster-whisper` and a speech model already on disk
   (`voice.stt`). Nothing is downloaded by this app.
 - **Brain**: either `"engine": "claude-cli"` (uses the Claude sign-in on this PC, no paid key) or `"engine": "api"`
