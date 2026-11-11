@@ -1,5 +1,5 @@
 import { WindowManager } from './wm.js';
-import { Stage, SequenceView, renderStill } from './stage.js';
+import { Stage, SequenceView, renderStill, clipStatus } from './stage.js';
 import * as sound from './sound.js';
 
 const shell = window.shell ?? null; // present when running inside the desktop shell
@@ -9,6 +9,7 @@ document.body.classList.toggle('overlay', overlay);
 if (query.has('silent')) sound.setMuted(true); // for tests: no voice, no music
 
 const stage = new Stage();
+window.betaSequence = { clipStatus }; // for the checks in test/ui
 let socket = null;
 let operator = 'Operator';
 let voice = { speak: 'server', listen: false };

@@ -82,6 +82,7 @@ export async function loadConfig(rootDir, overrides = {}) {
   const fromEnv = {};
   if (env.BETA_SEQUENCE_PORT) fromEnv.port = Number(env.BETA_SEQUENCE_PORT);
   if (env.BETA_SEQUENCE_STATE_DIR) fromEnv.stateDir = env.BETA_SEQUENCE_STATE_DIR;
+  if (env.BETA_SEQUENCE_PROJECTS_DIR) fromEnv.projectsDir = env.BETA_SEQUENCE_PROJECTS_DIR;
   if (env.BETA_SEQUENCE_PRINTOUTS_DIR) fromEnv.printouts = { dir: env.BETA_SEQUENCE_PRINTOUTS_DIR };
   return merge(merge(merge(defaults, fromFile), fromEnv), overrides);
 }

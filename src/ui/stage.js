@@ -39,6 +39,14 @@ function returnClip(url) {
   clips.delete(url);
 }
 
+/** For checks: which generated clips are loaded and whether they are playing. */
+export function clipStatus() {
+  return [...clips].map(([url, clip]) => ({
+    url, ready: clip.ready, users: clip.users, width: clip.video.videoWidth, height: clip.video.videoHeight,
+    time: clip.video.currentTime, error: clip.video.error?.message ?? null,
+  }));
+}
+
 const stillImages = new Map();
 export function loadImage(url) {
   if (!stillImages.has(url)) {
