@@ -90,7 +90,7 @@ from the same picture as first and last frame, and is stopped again. The sound i
 50 steps, grey backdrop, then the normal cut-out, loop and see-through steps. The request uses the layout of
 MiniMax's own prompt guide for first-and-last-frame clips. It worked the first time.
 
-| | LTX-2.5 (shipped Tayne) | MiniMax H3 (test) |
+| | LTX-2.5 (the Tayne shipped then, in teal sequins) | MiniMax H3 (test) |
 |---|---|---|
 | Movement | A clear strut: hips, shoulders and steps | A bouncy dance on the spot: arm pumps and knee bends; about 70% of LTX's movement (measured from the outline) |
 | Face and hands | Natural; fingers a little soft; a pink speck on a fingertip in some frames | Natural and steady; hands mostly loose fists, clean, no coloured specks |
@@ -102,7 +102,7 @@ MiniMax's own prompt guide for first-and-last-frame clips. It worked the first t
 | Cost of the dance | $0.28 | **$0.72** |
 | Cost per new dancer | about $0.35 | **about $0.78** (picture $0.03, dance $0.72, cut-out $0.03) |
 
-Things that make the comparison not perfectly even: the shipped Tayne was made on a magenta backdrop (before the
+Things that make the comparison not perfectly even: the Tayne shipped then was made on a magenta backdrop (before the
 grey-backdrop rule), which caused its fingertip speck; the H3 test used grey. SGLang hands the clip back as a
 compressed H.264 file (about 0.8 Mbit/s) where LTX hands back every frame without loss; no blockiness was visible
 at the final 540 by 720 size.
@@ -111,7 +111,7 @@ at the final 540 by 720 size.
 bit less, takes two and a half times the graphics-card time and costs over twice as much per dancer, and needs
 144 GB of model files. LTX-2.5 stays the default. H3 can be chosen with `--engine h3` when the details matter more
 than the price. The test files (the H3 loop, a still, a side-by-side video and H3's own clip with its sound) were
-given to the owner outside the repository; the shipped Tayne was not changed.
+given to the owner outside the repository; the Tayne shipped then was not changed.
 
 **Using it:**
 
@@ -265,7 +265,7 @@ Anyone can make new dancers with their own Modal account; nothing of the owner's
 
 ```powershell
 python tools/media/generate.py --name "Tayne" `
-  --prompt "Tayne: a flamboyant stage entertainer ... Dance: a confident strut on the spot ..." `
+  --prompt "Tayne: a slim man around forty ... wearing a black flat-brimmed hat ... Dance: a wide-legged squat groove ..." `
   --out projects/4d3d3d3/sequences/tayne --expressions smiling --seed 9002
 ```
 
@@ -350,21 +350,28 @@ reads it again before every clip):
 
 | Sequence | Who | Dance route | Backdrop | `hatLine` | Clip cost |
 |---|---|---|---|---|---|
-| `celery-man` | Awkward office worker, grey suit, celery-green tie | LTX-2.5 | blue | 0.28 (chin, set by eye) | $0.37 |
-| `oyster` | Cheerful person, pearl-grey satin shirt, pearl necklace; has `smiling.png` | LTX-2.5 | grey | 0.29 (chin, set by eye) | $0.31 |
-| `tayne` | Flamboyant entertainer, teal sequins, huge navy hat, white boots; has `smiling.png` | LTX-2.5 | magenta | 0.273 (hat brim, measured) | $0.35 |
-| `tayne/nude` | Same Tayne in a silly beach costume: lime-green sling swimsuit, a rubber-duck swim ring around the hips, same hat and boots | LTX-2.5 | blue | 0.25 (hat brim, set by eye) | $0.33 |
+| `celery-man` | Smug man around forty in an oversized shiny silver-grey 1980s suit, white shirt, thin dark-grey tie; fist pumps and knee bounces; has `smiling.png` | LTX-2.5 | blue | 0.28 (chin, set by eye) | $0.38 |
+| `oyster` | Same kind of man in a red flame-pattern skull cap, open red track jacket, black T-shirt, studded choker; bent-over bouncing and head-banging; has `smiling.png` | LTX-2.5 | grey | 0.29 (chin, set by eye) | $0.38 |
+| `tayne` | Same kind of man in a black flat-brimmed hat, black sunglasses, gold chain, orange-gold and black baroque silk shirt, black leather trousers and boots; arms flexed, squat groove and kicks; has `smiling.png` | LTX-2.5 | grey | 0.24 (sunglasses, just under the brim, set by eye) | $0.36 |
+| `tayne/nude` | Same Tayne in a silly beach costume: lime-green sling swimsuit, two stacked swim rings (the top one with a rubber-duck head) from the belly button to the upper thighs, same hat, sunglasses, chain and boots | LTX-2.5 | grey | 0.23 (sunglasses, just under the brim, set by eye) | $0.30 |
 | `celery-head` | Bonus: the earlier cartoon figure with a celery head | LTX-2.5 | magenta | 0.27 (measured) | $0.34 |
 
 All clips are 4.0 s loops at 24 frames per second, 540 × 720 (celery-head 480 × 720), 0.5 to 1.3 MB, VP9 with a
-see-through background. Every folder passes the contract check. The beach costume was redrawn from Tayne's own
-picture (same face, hat and pose); a tight bodysuit and a plain swimsuit were rejected because the fabric showed
-body contours, and the swim ring was added so nothing could read as suggestive in any frame.
+see-through background. Every folder passes the contract check. Clip costs include the picture.
 
-Known weak spots, all from the video model itself: Celery Man's baggy trousers bend oddly at the knee in a few
-frames; Tayne and beach Tayne have small coloured specks on fast-moving fingertips (made before the grey backdrop
-rule); Oyster's face blurs in fast moves, and the blur stops abruptly where his loop restarts. `smiling.png` for the cast are redrawn pictures, so the face differs a
-little from `still.png`.
+**Closer to the sketch (2026-11-11).** The first three were remade so they wear what the cast wears in the original
+sketch and dance more like it. As in the sketch, one invented man plays all three, so the three descriptions give
+the same age, hair and build and only the costume and dance change. Only the costume, hair colour, age bracket, pose
+and dance were matched; no picture of a real person went into any model, and the prompts name nobody. The beach
+costume was redrawn from the new Tayne picture (same face, hat, sunglasses, chain and boots). In all three drafts the
+drawing put the swim ring at the waist, so the swimsuit bottom showed below it; a second copy of the ring was added
+below the first one by hand (two stacked rings, no extra cost), and the dance was made from that picture.
+
+Known weak spots, all from the video model itself: in the beach costume the rings ride up a little in the fastest
+moves, so the plain green swimsuit bottom shows for a moment (nothing more); Oyster's face blurs while he bends
+forward and head-bangs; Celery Man's trouser legs go soft in fast knee bounces; the automatic `hatLine` fell at the
+shoulders or chest for all four, because raised fists and bending widen the outline, so all four were set by eye.
+`smiling.png` for the cast are redrawn pictures, so the face differs a little from `still.png`.
 
 ## Ledgers for this work
 
@@ -431,6 +438,22 @@ Nothing was downloaded: the owner's existing H3 copy was only read. Nothing fail
 | One Tayne loop with `--engine h3` | dance on one H200 436 s ($0.719), cut-out 38 s ($0.025) | $0.744 |
 | Fetching the SGLang software image into Modal | | under $0.05 (estimate) |
 | **Total** | | **about $0.80** |
+
+### Cast closer to the sketch (2026-11-11, cap $4): $2.33
+
+All measured by the tool. No download, no software build (the cloud software was already there).
+
+| What | Steps | Cost |
+|---|---|---|
+| Pictures | Celery Man, Oyster, Tayne: one draft each, all kept | $0.095 |
+| | Beach costume: 3 drafts (the ring sat at the waist each time; the last one was kept and given a second ring by hand) | $0.087 |
+| Dances | Celery Man, first take (good, but a little less bouncy; replaced) | $0.312 |
+| | Celery Man, second take (kept) | $0.351 |
+| | Oyster | $0.352 |
+| | Tayne | $0.331 |
+| | Beach costume, first take (kept) | $0.271 |
+| | Beach costume, second take ("stay low" wording; it hardly moved, so it was dropped) | $0.526 |
+| **Total** | | **$2.33** |
 
 ## Music
 
