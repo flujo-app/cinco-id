@@ -22,7 +22,7 @@ export class Connectors {
     await Promise.all(Object.entries(this.servers).map(async ([name, spec]) => {
       if (spec.disabled) return;
       try {
-        const client = new Client({ name: 'beta-sequence', version: '0.1.0' });
+        const client = new Client({ name: 'cinco-id', version: '2.5.0' });
         const transport = spec.url
           ? new StreamableHTTPClientTransport(new URL(spec.url), spec.headers ? { requestInit: { headers: spec.headers } } : undefined)
           : new StdioClientTransport({ command: spec.command, args: spec.args ?? [], env: { ...process.env, ...(spec.env ?? {}) }, cwd: spec.cwd, stderr: 'ignore' });

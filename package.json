@@ -1,9 +1,11 @@
 {
-  "name": "beta-sequence",
-  "version": "0.1.0",
+  "name": "cinco-id",
+  "version": "2.5.0",
   "private": true,
+  "productName": "CINCO ID",
+  "license": "MIT",
   "type": "module",
-  "description": "A talking Win95-style computer that loads dancing sequences, opens far too many windows and can do real work.",
+  "description": "Cinco Identity Generator 2.5: a talking Win95-style computer that loads dancing sequences, opens far too many windows and can do real work.",
   "main": "src/shell/main.js",
   "scripts": {
     "start": "electron .",

@@ -45,7 +45,7 @@ function createWindow() {
     })
     : new BrowserWindow({
       ...common, width: Math.min(1360, area.width), height: Math.min(860, area.height),
-      title: 'Beta Sequence', autoHideMenuBar: true,
+      title: 'Cinco Identity Generator 2.5', autoHideMenuBar: true,
     });
   if (overlay) {
     window.setAlwaysOnTop(true, 'screen-saver');
@@ -67,7 +67,7 @@ function switchMode() {
 
 function buildTray() {
   tray ??= new Tray(trayIcon());
-  tray.setToolTip('Beta Sequence');
+  tray.setToolTip('Cinco Identity Generator 2.5');
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: overlay ? 'Show as a window' : 'Show on top of my desktop', click: switchMode },
     { label: 'Talk (Ctrl+Alt+Space)', click: () => window?.webContents.send('toggle-listen') },

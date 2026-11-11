@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const shots = process.argv[2];
-const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'beta-sequence-overlay-'));
+const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'cinco-id-overlay-'));
 
 function powershell(script) {
   return execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { encoding: 'utf8' }).trim();
@@ -40,7 +40,7 @@ function programAt(x, y) {
 const app = await electron.launch({
   args: ['.', '--port=19783', '--silent', '--no-tray', '--no-print', '--overlay'],
   cwd: root,
-  env: { ...process.env, BETA_SEQUENCE_CONFIG: 'none', BETA_SEQUENCE_STATE_DIR: path.join(temp, 'state'), BETA_SEQUENCE_PRINTOUTS_DIR: path.join(temp, 'printouts') },
+  env: { ...process.env, CINCO_ID_CONFIG: 'none', CINCO_ID_OPERATOR: 'Paul', CINCO_ID_STATE_DIR: path.join(temp, 'state'), CINCO_ID_PRINTOUTS_DIR: path.join(temp, 'printouts') },
 });
 try {
   const page = await app.firstWindow();

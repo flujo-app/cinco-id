@@ -14,14 +14,14 @@ const projects = take('--projects');
 const shots = take('--shots');
 const names = args;
 if (!names.length) { console.error('Give at least one sequence name.'); process.exit(2); }
-const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'beta-sequence-clip-'));
+const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'cinco-id-clip-'));
 
 const app = await electron.launch({
   args: ['.', '--port=19784', '--silent', '--no-tray', '--no-print'],
   cwd: root,
   env: {
-    ...process.env, BETA_SEQUENCE_CONFIG: 'none', BETA_SEQUENCE_STATE_DIR: path.join(temp, 'state'),
-    BETA_SEQUENCE_PRINTOUTS_DIR: path.join(temp, 'printouts'), ...(projects ? { BETA_SEQUENCE_PROJECTS_DIR: projects } : {}),
+    ...process.env, CINCO_ID_CONFIG: 'none', CINCO_ID_OPERATOR: 'Paul', CINCO_ID_STATE_DIR: path.join(temp, 'state'),
+    CINCO_ID_PRINTOUTS_DIR: path.join(temp, 'printouts'), ...(projects ? { CINCO_ID_PROJECTS_DIR: projects } : {}),
   },
 });
 let failed = false;

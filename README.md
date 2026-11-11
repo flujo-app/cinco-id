@@ -1,10 +1,14 @@
-# Beta Sequence
+# CINCO ID
 
-A talking computer with a Windows 95 screen. You tell it what to load, it opens far too many windows of
-dancing figures, answers in a deadpan robot voice, and can do real work through an AI brain and outside tools.
+**Cinco Identity Generator 2.5.** A talking computer with a Windows 95 screen. You tell it what to load, it opens far
+too many windows of dancing figures, answers in a deadpan robot voice, and can do real work through an AI brain and
+outside tools.
 
-It started as a tribute to a certain sketch about a man, his office computer and some dancing sequences. Say the
-same lines and you get a similar evening. Say anything else and it still does something sensible.
+It is an unofficial fan tribute to a certain sketch about a man, his office computer and some dancing sequences, and
+is not connected to the people who made that sketch. Say the same lines and you get a similar evening. Say anything
+else and it still does something sensible.
+
+The dancers in the demo are invented people. Their pictures and dance clips are machine-made (AI-generated).
 
 ![The Win95 desktop full of dancing sequences](docs/screenshot.png)
 
@@ -122,3 +126,8 @@ node test/ui/overlay-check.mjs             # checks the see-through mode on the 
 node test/ui/print-check.mjs               # checks that a printout reaches the Windows print system
 node test/ui/clip-check.mjs "Celery Head"  # checks that a generated clip plays see-through
 ```
+
+## Licence
+
+MIT, see [LICENSE](LICENSE). The demo cast's pictures and clips are machine-made; the models used and their licences
+are listed in [docs/MEDIA.md](docs/MEDIA.md).

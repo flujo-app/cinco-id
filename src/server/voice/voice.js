@@ -161,7 +161,7 @@ export class Listener {
 
   async transcribe(buffer, { extension = 'webm', vocabulary = [] } = {}) {
     if (!this.available) throw new Error('Speech recognition is not set up.');
-    const stem = path.join(os.tmpdir(), `beta-sequence-${process.pid}-${Date.now()}`);
+    const stem = path.join(os.tmpdir(), `cinco-id-${process.pid}-${Date.now()}`);
     const heard = `${stem}.${extension}`;
     const wav = `${stem}-16k.wav`;
     await fs.writeFile(heard, buffer);
