@@ -81,9 +81,17 @@ function buildTray() {
  * PDF printer (Windows then asks where to save the file); "dialog" shows the print window.
  */
 async function printPage({ url, settings }) {
-  const page = new BrowserWindow({ show: false, webPreferences: { sandbox: true } });
+  // The sheet gets its own small, visible window. Windows attaches the printer's "save as"
+  // window to whatever is in front, and switches that window off for clicks while it is open.
+  // With a hidden window that would be some other program's window; this way it is ours.
+  const page = new BrowserWindow({
+    width: 300, height: 400, show: false, title: 'Printing', resizable: false, minimizable: false, maximizable: false,
+    alwaysOnTop: true, skipTaskbar: true, autoHideMenuBar: true, backgroundColor: '#ffffff', webPreferences: { sandbox: true },
+  });
   try {
     await page.loadURL(url);
+    page.show();
+    page.focus();
     const printers = await page.webContents.getPrintersAsync();
     const wanted = printers.find(printer => printer.name === settings.printer);
     const silent = settings.print !== 'dialog' && Boolean(wanted);
