@@ -13,7 +13,8 @@ The dancers are invented people. Their pictures and dance clips are machine-made
 [![The Win95 desktop full of dancing sequences. Click to watch the demo with sound.](docs/screenshot.png)](docs/demo.mp4)
 
 **[Watch the demo with sound](docs/demo.mp4)**: the first-start Setup window, the 4d3d3d3 routine, a dancer that was
-made from one sentence, and an incoming call.
+made from one sentence, and an incoming call. In that video the computer speaks with a voice built into Windows.
+There is also [the same demo with the robot voice](docs/demo-robot-voice.mp4).
 
 ## What it can do
 
@@ -276,7 +277,7 @@ node test/ui/print-check.mjs               # checks that a printout reaches the 
 node test/ui/clip-check.mjs "Celery Head"  # checks that a generated clip plays see-through
 node test/ui/voice-check.mjs               # LOUD on purpose: checks that the computer really speaks
 node test/ui/live-generate.mjs --yes-spend # COSTS MONEY: makes a real new dancer from inside the app
-node tools/demo/record.mjs                 # LOUD: records the demo video with the app's own sound
+node tools/demo/record.mjs --voice zira    # LOUD: records the demo video with the app's own sound (or --voice robot)
 ```
 
 ## Licence
