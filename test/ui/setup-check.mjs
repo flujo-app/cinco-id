@@ -37,6 +37,7 @@ await fs.writeFile(path.join(standIn, 'modal', '__init__.py'), [
   '    raise RuntimeError("This is a stand-in for Modal in a test; nothing was sent to the cloud.")',
   '',
 ].join('\n'));
+await fs.writeFile(path.join(standIn, 'modal', 'exception.py'), 'raise RuntimeError("This is a stand-in for Modal in a test; nothing was sent to the cloud.")\n');
 await fs.writeFile(path.join(standIn, 'modal', '__main__.py'), 'print("Web authentication finished successfully! (stand-in, nothing was signed in)")\n');
 python ??= execFileSync('python', ['-c', 'import sys; print(sys.executable)'], { encoding: 'utf8' }).trim();
 const env = { PYTHONPATH: standIn, MODAL_CONFIG_PATH: path.join(temp, 'no-modal.toml'), CINCO_ID_OPERATOR: null, CINCO_ID_CONFIG: null };
@@ -91,6 +92,7 @@ try {
   assert.match(login, /stand-in/);
 
   await setup.locator('button[data-role=prepare]').click();
+  await page.waitForFunction(() => document.querySelector('.kind-setup button[data-role=prepare-yes]')?.disabled === false, null, { timeout: 150000 });
   const confirm = await setup.locator('.setup-page').textContent();
   console.log(`"Prepare..." asks first: ${confirm.replace(/\s+/g, ' ').slice(0, 260)}`);
   assert.match(confirm, /costs about \$[\d.]+/, 'the cost is shown before anything starts');

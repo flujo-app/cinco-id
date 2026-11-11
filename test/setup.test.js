@@ -97,12 +97,18 @@ test('the ears test asks the chosen Python with fixed code, and only an existing
   }
 });
 
-test('the cost and time of preparing are read from docs/MEDIA.md', async () => {
-  const info = await prepareInfo(path.join(rootDir, 'docs', 'MEDIA.md'));
-  assert.equal(info.found, true);
-  assert.match(info.time, /^\d+( to \d+)? minutes$/);
-  assert.match(info.cost, /^\$\d+(\.\d+)?$/);
-  assert.equal((await prepareInfo(path.join(rootDir, 'docs', 'missing.md'))).found, false);
+test('when the dancer tools cannot be asked, the fallback numbers come from the guide\'s table', async () => {
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'cinco-id-guide-'));
+  try {
+    const guide = path.join(temp, 'MEDIA.md');
+    await fs.writeFile(guide, '| | Size | Time | Cloud cost |\n|---|---|---|---|\n| A | 1 GB | about 1 minutes | about $0.01 |\n| **Total** | **240 GB** | **about 40 minutes** | **about $0.25** |\n');
+    assert.deepEqual(await prepareInfo(guide), { found: true, size: '240 GB', time: '40 minutes', cost: '$0.25', source: 'docs/MEDIA.md' });
+    await fs.writeFile(guide, 'Nothing about costs here.\n');
+    assert.equal((await prepareInfo(guide)).found, false);
+    assert.equal((await prepareInfo(path.join(temp, 'missing.md'))).found, false);
+  } finally {
+    await fs.rm(temp, { recursive: true, force: true });
+  }
 });
 
 test('saying or typing "setup" or "settings" opens the Setup window', async () => {

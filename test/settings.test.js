@@ -270,9 +270,32 @@ test('the Sign in to Modal and Prepare buttons start only the fixed programs, Pr
     assert.equal(prepared.ok, true);
     assert.equal(prepared.progress, 0.5);
 
-    const info = await (await fetch(`${base}/api/setup/prepare-info`)).json();
-    assert.equal(info.found, true, 'cost and time are read from docs/MEDIA.md');
-    assert.match(info.cost, /^\$\d/);
-    assert.match(info.time, /minutes$/);
+  } finally { await stop(); }
+});
+
+test('before Prepare, the plan comes from the dancer tools\' own dry run, with the guide as fallback', async () => {
+  const asked = [];
+  let answer = { code: 0, stdout: 'some line\n{"dryRun": true, "prepare": {"downloads": ["LTX-2.5"], "alreadyReady": [], "downloadGb": 80, "minutes": 12, "usdEstimate": 0.07, "summary": "downloads LTX-2.5", "ltxSignIn": "Accept the licence on Hugging Face first."}, "danceModelNow": "Wan2.2", "why": "LTX-2.5 is not downloaded yet."}\n', stderr: '' };
+  const run = async (command, args) => { asked.push({ command, args }); return answer; };
+  const { base, python, stop } = await start({ parts: { probe: { listVoices: async () => VOICES, findCommand: async () => null, home: os.tmpdir(), env: {}, run } } });
+  try {
+    await post(base, '/api/settings', { media: { python } });
+    const plan = await (await fetch(`${base}/api/setup/prepare-info`)).json();
+    assert.deepEqual(asked[0], { command: python, args: [path.join(rootDir, 'tools', 'media', 'generate.py'), '--prepare', '--dry-run'] });
+    assert.equal(plan.fromTools, true);
+    assert.equal(plan.size, '80 GB');
+    assert.equal(plan.time, '12 minutes');
+    assert.equal(plan.cost, '$0.07');
+    assert.equal(plan.summary, 'downloads LTX-2.5');
+    assert.equal(plan.ltxSignIn, 'Accept the licence on Hugging Face first.');
+    assert.equal(plan.danceModelNow, 'Wan2.2');
+    assert.equal(plan.why, 'LTX-2.5 is not downloaded yet.');
+
+    // The tools cannot answer: the numbers from the guide, said plainly where they come from.
+    answer = { code: 1, stdout: '{"error": "Could not reach the cloud computer service."}\n', stderr: '' };
+    const fallback = await (await fetch(`${base}/api/setup/prepare-info`)).json();
+    assert.equal(fallback.fromTools, false);
+    assert.equal(fallback.reason, 'Could not reach the cloud computer service.');
+    assert.equal(fallback.source, 'docs/MEDIA.md');
   } finally { await stop(); }
 });
