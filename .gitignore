@@ -1,6 +1,7 @@
 node_modules/
 harness.config.json
 printouts/
+/whatsapp/
 .cache/
 .local/
 *.log

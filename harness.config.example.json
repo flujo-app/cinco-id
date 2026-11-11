@@ -26,6 +26,7 @@
   "mcpServers": {
     "example": { "command": "npx", "args": ["-y", "some-mcp-server"], "disabled": true }
   },
+  "whatsapp": { "enabled": false, "connectorDir": null, "brainTools": ["search_contacts", "get_contact_by_id"] },
   "events": {
     "whatsapp": { "secret": "whsec_<made by: npm run whatsapp:link>", "messages": "off", "declineTool": null }
   },

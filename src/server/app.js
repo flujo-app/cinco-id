@@ -17,6 +17,7 @@ import { Connectors } from './connectors.js';
 import { Generator } from './generator.js';
 import { Speaker, Listener } from './voice/voice.js';
 import { verify, routeWhatsApp } from './events/webhook.js';
+import { WhatsAppLink } from './whatsapp.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const UI_DIR = path.join(here, '..', 'ui');
@@ -105,6 +106,7 @@ export async function createApp({ rootDir, dataDir = null, overrides = {}, env =
   const connectors = parts.connectors ?? await new Connectors(config.mcpServers, {
     declineTool: config.events.whatsapp.declineTool,
     onProblem: text => notes.push(text),
+    ...(parts.connectorRetryMs ? { retryMs: parts.connectorRetryMs } : {}),
   }).start();
   let port = config.port;
   // Two keys to the /mcp door: one for the computer's own brain (new on every start), and one
@@ -145,6 +147,16 @@ export async function createApp({ rootDir, dataDir = null, overrides = {}, env =
   // Outside tools that come back (or go away) later: tell the screen, and keep Decline honest.
   connectors.on?.('change', () => computer.declineAvailabilityChanged());
   connectors.on?.('note', text => computer.send({ type: 'note', text }));
+  // CINCO ID's own WhatsApp link (started in listen(), once the real port is known).
+  const whatsapp = new WhatsAppLink({
+    config, connectors, secrets,
+    getPort: () => port,
+    save: async changes => { if (config.configFile) await writeSettingsFile(config.configFile, changes); },
+    probe: parts.whatsappProbe ?? { env },
+    ...(parts.whatsappOptions ?? {}), // for tests: { pollMs, dropNoticeMs }
+  });
+  whatsapp.on('note', text => computer.send({ type: 'note', text }));
+  whatsapp.on('change', view => broadcast({ type: 'whatsapp', ...view }));
   const listener = parts.listener ?? new Listener(config.voice.stt);
   const runningEars = JSON.stringify(config.voice.stt);
   // The Setup window opens by itself the first time, when there is no settings file yet.
@@ -194,11 +206,15 @@ export async function createApp({ rootDir, dataDir = null, overrides = {}, env =
       const url = new URL(request.url, 'http://127.0.0.1');
       const route = decodeURIComponent(url.pathname);
 
-      // Signed events from outside programs (WhatsApp calls and messages).
+      // Signed events from outside programs (WhatsApp calls and messages): from CINCO ID's own
+      // WhatsApp link, or from a connector run by another program (the manual way). The secret
+      // that signed it says which one sent it.
       if (request.method === 'POST' && route === '/hooks/whatsapp') {
         const body = (await readBody(request, 1024 * 1024)).toString('utf8');
-        if (!verify({ secret: config.events.whatsapp.secret, headers: request.headers, body })) return send(response, 401, 'Bad signature.');
-        const outcome = routeWhatsApp(JSON.parse(body), computer, config.events.whatsapp);
+        const via = verify({ secret: whatsapp.secretForCheck(), headers: request.headers, body }) ? 'own'
+          : verify({ secret: config.events.whatsapp.secret, headers: request.headers, body }) ? 'manual' : null;
+        if (!via) return send(response, 401, 'Bad signature.');
+        const outcome = routeWhatsApp(JSON.parse(body), computer, via === 'own' ? { ...config.events.whatsapp, messages: 'off' } : config.events.whatsapp, { via });
         return send(response, 200, { ok: true, outcome });
       }
 
@@ -310,6 +326,11 @@ export async function createApp({ rootDir, dataDir = null, overrides = {}, env =
       }
       if (route === '/api/setup/prepare-info') return send(response, 200, await tasks.plan({ docsFile: path.join(config.appDir, 'docs', 'MEDIA.md') }));
       if (route === '/api/setup/task') return send(response, 200, tasks.status(url.searchParams.get('name')));
+      if (route === '/api/setup/whatsapp') {
+        const overview = await whatsapp.overview();
+        const qr = url.searchParams.get('qr') === '1' ? await whatsapp.qr() : null;
+        return send(response, 200, { ...overview, qr });
+      }
       return send(response, 404, 'Not found.');
     }
     if (request.method !== 'POST') return send(response, 405, 'Not allowed.');
@@ -337,6 +358,20 @@ export async function createApp({ rootDir, dataDir = null, overrides = {}, env =
       return send(response, 200, await (probe.checkEars ?? checkEars)(ears.python, ears.model, { hubCache: savedEars.hubCache ?? null }));
     }
     if (route === '/api/setup/task') return send(response, 200, await tasks.start(String(body.task), { confirm: body.confirm === true }));
+    // The WhatsApp page: each button is one fixed action; only a phone number's digits are passed on.
+    if (route === '/api/setup/whatsapp') {
+      const action = String(body.action ?? '');
+      if (action === 'link') return send(response, 200, await whatsapp.link());
+      if (action === 'stop') return send(response, 200, await whatsapp.stop({ disable: true }));
+      if (action === 'unlink') {
+        if (body.confirm !== true) throw Object.assign(new Error('Unlinking needs a clear yes first.'), { status: 400 });
+        return send(response, 200, await whatsapp.unlink());
+      }
+      if (action === 'install') return send(response, 200, await whatsapp.install());
+      if (action === 'pair') return send(response, 200, await whatsapp.pairingCode(body.phone));
+      if (action === 'check') { await whatsapp.findNode({ fresh: true }); return send(response, 200, await whatsapp.overview()); }
+      throw Object.assign(new Error('There is no such action.'), { status: 400 });
+    }
     return send(response, 404, 'Not found.');
   }
 
@@ -420,7 +455,7 @@ export async function createApp({ rootDir, dataDir = null, overrides = {}, env =
   });
 
   return {
-    config, computer, library, server, speaker, listener, connectors, notes, guestToken, seeded, secrets, tasks,
+    config, computer, library, server, speaker, listener, connectors, notes, guestToken, seeded, secrets, tasks, whatsapp,
     get firstRun() { return firstRun; },
     async listen() {
       const tryPort = wanted => new Promise((resolve, reject) => {
@@ -440,6 +475,12 @@ export async function createApp({ rootDir, dataDir = null, overrides = {}, env =
           + `Outside events such as WhatsApp calls are sent to port ${config.port} and will not arrive here until that port is free and CINCO ID is restarted.`);
       }
       port = server.address().port;
+      // WhatsApp was linked before: start CINCO ID's own connector again, with the real port.
+      if (whatsapp.enabled) {
+        whatsapp.start().then(view => {
+          if (view.state === 'problem') computer.send({ type: 'note', level: 'error', text: `WhatsApp: ${view.text}` });
+        }).catch(error => computer.problem(`WhatsApp could not start: ${error.message}`));
+      }
       listener.warm();
       speaker.warm(['yes', 'ok', 'added', 'printing', 'betaOffer', 'notComputing', 'gateConfirm', 'generating', 'cleared', 'closed']
         .map(key => computer.fill(computer.phrases[key])));
@@ -452,6 +493,7 @@ export async function createApp({ rootDir, dataDir = null, overrides = {}, env =
       computer.generator?.stop?.();
       speaker.stop();
       listener.stop();
+      await whatsapp.close().catch(() => {});
       await connectors.stop?.();
       await new Promise(resolve => server.close(resolve));
     },

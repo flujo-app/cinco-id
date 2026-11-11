@@ -30,12 +30,15 @@ function numberFromJid(jid) {
 /**
  * Turns a WhatsApp event (from mcp-whatsapp-web) into something happening on screen.
  * Message text is never handed to the brain: outside text must not be able to give orders.
+ * `via` says which WhatsApp connection sent it ("own": CINCO ID's own link, "manual": a
+ * connector run by another program); a call is declined through the same one.
  */
-export function routeWhatsApp(event, computer, settings = {}) {
+export function routeWhatsApp(event, computer, settings = {}, { via = 'manual' } = {}) {
   const data = event?.data ?? {};
   if (event?.name === 'call.received') {
     const contact = data.contact ?? {};
     computer.incomingCall({
+      via,
       callId: data.callId,
       chatId: data.chatId ?? data.from,
       isVideo: data.isVideo === true,

@@ -20,10 +20,11 @@ async function api(url, body) {
   return { response, data };
 }
 
-const STEPS = ['Welcome', 'Voice', 'Listening', 'Brain', 'New dancers', 'Finish'];
+const STEPS = ['Welcome', 'Voice', 'Listening', 'Brain', 'WhatsApp', 'New dancers', 'Finish'];
+const PAGE_STEP = { whatsapp: 4 };
 const FIELD_STEP = {
   operator: 0, voice: 1, ears: 2, earsPython: 2, earsModel: 2,
-  brain: 3, brainUrl: 3, brainModel: 3, brainKeyEnv: 3, brainKey: 3, mediaPython: 4, openrouterKey: 4,
+  brain: 3, brainUrl: 3, brainModel: 3, brainKeyEnv: 3, brainKey: 3, mediaPython: 5, openrouterKey: 5,
 };
 
 /**
@@ -31,14 +32,19 @@ const FIELD_STEP = {
  *   context.shell     the desktop shell bridge (or null in a plain browser)
  *   context.sound     the sound module (for "Say something")
  *   context.firstRun  true when it opened by itself on the first start
+ *   context.page      a page to open on (for example "whatsapp"), or nothing for the first one
  *   context.onFinished(saved) called once when the window goes away
+ * record.goTo(page) jumps to a page later (saying "link whatsapp" while Setup is open).
  */
 export function buildSetup(record, context) {
   const { shell, sound } = context;
   let settings = null;
   let status = null;
   let prepare = null;
-  let step = 0;
+  let step = PAGE_STEP[context.page] ?? 0;
+  let whatsapp = null; // what the WhatsApp page last heard from the computer
+  let waPoller = null;
+  let waUpdate = null;
   let saved = false;
   let busy = false;
   let result = null;
@@ -67,7 +73,22 @@ export function buildSetup(record, context) {
 
   record.cleanup = () => {
     clearInterval(poller);
+    clearTimeout(waPoller);
+    waPoller = null;
+    waUpdate = null;
     context.onFinished?.(saved);
+  };
+  record.goTo = name => {
+    if (!(name in PAGE_STEP) || busy || result) return;
+    confirming = false;
+    step = PAGE_STEP[name];
+    render();
+  };
+  // The computer tells every screen when the WhatsApp link changes.
+  record.whatsappChanged = view => {
+    if (!whatsapp?.program) return; // the page asks for the whole picture itself
+    whatsapp = { ...whatsapp, ...view, qr: view.linked || !view.running ? null : whatsapp.qr };
+    waUpdate?.(whatsapp);
   };
 
   // ---------- small building blocks ----------
@@ -328,6 +349,155 @@ export function buildSetup(record, context) {
       refresh();
     },
 
+    function whatsappPage() {
+      title('WhatsApp');
+      para('Linking makes CINCO ID one more linked device on your WhatsApp, like WhatsApp on a computer. '
+        + 'It then shows who is calling and can decline a call. It cannot answer calls, and it never hands your messages to the brain.');
+
+      const pc = group('This PC');
+      const facts = el('div', 'setup-facts');
+      pc.append(facts);
+      const fact = label => { const row = el('div'); const value = el('b', '', 'checking...'); row.append(el('span', 'setup-label', label), value); facts.append(row); return value; };
+      const programFact = fact('WhatsApp connector:');
+      const nodeFact = fact('Node.js:');
+      const pcRow = el('div', 'setup-row');
+      pc.append(pcRow);
+      const install = button(pcRow, 'Install', () => act('install'), 'whatsapp-install');
+      const check = button(pcRow, 'Check again', () => act('check'), 'whatsapp-check');
+      const installLine = statusLine(pc);
+      installLine.dataset.role = 'whatsapp-install-status';
+      const needs = el('div', 'setup-hint', 'The link runs a small helper program, the WhatsApp connector (mcp-whatsapp-web). It needs Node.js 22 or newer on this PC, '
+        + 'and Git to install it. Install downloads it from its author\'s page on GitHub into your data folder; nothing else is changed.');
+      pc.append(needs);
+
+      const box = group('Link');
+      const line = statusLine(box);
+      line.dataset.role = 'whatsapp-status';
+      const qrWrap = el('div', 'whatsapp-qr-wrap');
+      const qr = el('img', 'whatsapp-qr');
+      qr.alt = 'WhatsApp QR code';
+      const qrHint = el('div', 'setup-hint', 'On your phone, open WhatsApp, then Settings, Linked devices, Link a device, and point the phone at this code. It changes every little while; that is normal.');
+      qrWrap.append(qr, qrHint);
+      box.append(qrWrap);
+      // The first time the code appears, bring all of it into view.
+      let scrollWhenLoaded = false;
+      qr.addEventListener('load', () => {
+        if (!scrollWhenLoaded) return;
+        scrollWhenLoaded = false;
+        qrWrap.scrollIntoView({ block: 'nearest' });
+      });
+      const row = el('div', 'setup-row');
+      box.append(row);
+      const link = button(row, 'Link WhatsApp', () => act('link'), 'whatsapp-link');
+      const stop = button(row, 'Stop linking', () => act('stop'), 'whatsapp-stop');
+      const test = button(row, 'Test call window', async b => {
+        b.disabled = true;
+        try { await api('/api/command', { text: 'test call' }); } catch (problem) { error(problem.message); } finally { b.disabled = false; }
+      }, 'whatsapp-test-call');
+      const unlink = button(row, 'Unlink...', () => { asking.hidden = false; unlink.disabled = true; }, 'whatsapp-unlink');
+      const asking = el('div', 'setup-confirm');
+      asking.hidden = true;
+      asking.append(el('div', 'setup-text', 'Unlink WhatsApp? CINCO ID is removed from the linked devices on your WhatsApp, and calls no longer show up here.'));
+      const askRow = el('div', 'setup-row');
+      asking.append(askRow);
+      button(askRow, 'Yes, unlink', () => { asking.hidden = true; act('unlink', { confirm: true }); }, 'whatsapp-unlink-yes');
+      button(askRow, 'No', () => { asking.hidden = true; unlink.disabled = false; }, 'whatsapp-unlink-no');
+      box.append(asking);
+
+      const pairing = el('div', 'setup-sub whatsapp-pairing');
+      pairing.append(el('div', 'setup-hint', 'Or link with your phone number instead of the code: type it with the country code, then press Get a code.'));
+      const pairRow = el('div', 'setup-row');
+      const phone = textInput('', () => {}, { name: 'whatsappPhone', placeholder: 'for example 4915112345678', max: 20 });
+      pairRow.append(phone);
+      button(pairRow, 'Get a code', async b => {
+        b.disabled = true;
+        pairLine.textContent = 'Asking WhatsApp for a code...';
+        try {
+          const { data } = await api('/api/setup/whatsapp', { action: 'pair', phone: phone.value });
+          pairLine.textContent = data.message;
+          pairCode.textContent = data.code ?? '';
+        } catch (problem) { pairLine.textContent = problem.message; pairCode.textContent = ''; } finally { b.disabled = false; }
+      }, 'whatsapp-pair');
+      pairing.append(pairRow);
+      const pairCode = el('div', 'whatsapp-code');
+      pairCode.dataset.role = 'whatsapp-code';
+      const pairLine = statusLine(pairing);
+      pairing.append(pairCode);
+      box.append(pairing);
+
+      let shown = null; // a problem from the last button, kept on screen until the next one
+      async function act(action, extra = {}) {
+        shown = null;
+        for (const b of [install, check, link, stop, unlink]) b.disabled = true;
+        if (action === 'link') line.textContent = 'Starting the WhatsApp helper...';
+        if (action === 'install') { installLine.textContent = 'Starting...'; installLine.hidden = false; }
+        try {
+          await api('/api/setup/whatsapp', { action, ...extra });
+        } catch (problem) {
+          shown = { where: action === 'install' || action === 'check' ? installLine : line, text: problem.message };
+        }
+        await poll();
+      }
+
+      const update = waUpdate = data => {
+        const program = data.program ?? {};
+        const node = data.node ?? {};
+        const task = data.install ?? {};
+        programFact.textContent = program.ok ? `version ${program.version} (${program.source === 'installed' ? 'installed by CINCO ID' : program.source === 'settings' ? 'the folder in the settings' : 'the folder next to CINCO ID'})`
+          : program.tooOld ? `version ${program.version}, too old` : program.found ? 'not usable' : 'not installed';
+        nodeFact.textContent = node.ok ? `version ${node.version}` : node.found ? `version ${node.version ?? '?'}, too old` : 'not found';
+        install.hidden = Boolean(program.ok) && !task.running;
+        install.disabled = Boolean(task.running) || !node.ok;
+        check.hidden = Boolean(program.ok && node.ok);
+        check.disabled = Boolean(task.running);
+        const progress = task.running || task.ok === false ? [task.message, ...(task.lines ?? []).slice(-2)] : [task.message];
+        installLine.textContent = task.message ? progress.filter(Boolean).join('\n')
+          : !node.ok ? node.message ?? '' : !program.ok ? program.message ?? '' : '';
+        const ready = program.ok && node.ok;
+        // Once everything is there, the long explanation gives way to the link itself.
+        needs.textContent = ready && !task.running
+          ? 'The link runs the WhatsApp connector with the Node.js on this PC.'
+          : 'The link runs a small helper program, the WhatsApp connector (mcp-whatsapp-web). It needs Node.js 22 or newer on this PC, '
+            + 'and Git to install it. Install downloads it from its author\'s page on GitHub into your data folder; nothing else is changed.';
+        installLine.hidden = !installLine.textContent;
+        line.textContent = data.text ?? '';
+        link.hidden = data.running;
+        link.disabled = !ready || Boolean(task.running);
+        stop.hidden = !data.running || data.linked;
+        stop.disabled = false;
+        test.hidden = !data.linked;
+        unlink.hidden = !data.linked;
+        if (!data.linked) asking.hidden = true;
+        unlink.disabled = !asking.hidden;
+        pairing.classList.toggle('off', !data.running || data.linked);
+        const showQr = Boolean(data.running && !data.linked && data.qr);
+        const appearing = showQr && qrWrap.classList.contains('off');
+        if (showQr && qr.getAttribute('src') !== data.qr) qr.src = data.qr;
+        if (!showQr) qr.removeAttribute('src');
+        qrWrap.classList.toggle('off', !showQr);
+        if (appearing) scrollWhenLoaded = true;
+        if (showQr && !['waiting_for_link', 'reconnecting'].includes(data.state)) line.textContent = 'Waiting for your phone to scan the code.';
+        if (data.linked) pairCode.textContent = '';
+        if (shown) { shown.where.textContent = shown.text; shown.where.hidden = false; }
+      };
+
+      // Keeps asking while this page is open: the QR code changes, and it switches to "Linked" by itself.
+      let round = 0;
+      async function poll() {
+        clearTimeout(waPoller);
+        const mine = ++round;
+        try {
+          const wantQr = whatsapp === null || (whatsapp.running && !whatsapp.linked);
+          const { data } = await api(`/api/setup/whatsapp${wantQr ? '?qr=1' : ''}`);
+          whatsapp = data;
+          if (waUpdate === update) update(data);
+        } catch { /* the next round tries again */ }
+        if (waUpdate === update && mine === round) waPoller = setTimeout(poll, 2000);
+      }
+      if (whatsapp) update(whatsapp);
+      poll();
+    },
+
     function dancers() {
       title('New dancers');
       para('Saying "generate a new sequence of ..." makes a brand-new dancer in the cloud, on your own Modal account '
@@ -430,6 +600,7 @@ export function buildSetup(record, context) {
       fact('Listening:', body.voice.stt.engine === 'whisper' ? `faster-whisper, ${body.voice.stt.model}` : 'off');
       fact('Brain:', brainText);
       if (body.brain.engine === 'api') fact('Brain key:', keyNote('brain', settings.secrets.brain));
+      fact('WhatsApp:', whatsapp?.linked ? 'linked' : whatsapp?.running ? 'waiting to be linked' : 'not linked');
       fact('New dancers:', status?.modal.signedIn ? 'signed in to Modal' : 'not set up');
       fact('OpenRouter key:', keyNote('openrouter', settings.secrets.openrouter));
       page.append(summary);
@@ -487,6 +658,10 @@ export function buildSetup(record, context) {
 
   function render(problem = null) {
     page.replaceChildren();
+    // Only the WhatsApp page keeps asking the computer; any other page stops that.
+    clearTimeout(waPoller);
+    waPoller = null;
+    waUpdate = null;
     stepList.replaceChildren(...STEPS.map((name, index) => el('li', index === step ? 'current' : index < step ? 'done' : '', name)));
     if (!settings) {
       title('Setup');
@@ -542,7 +717,11 @@ export function buildSetup(record, context) {
     try {
       status = (await api('/api/setup/status')).data;
     } catch { status = { voices: [], voder: { available: false }, claude: { found: false }, modal: { command: false, signedIn: false }, openrouter: { set: false }, ears: { configured: false } }; }
-    if (settings && !busy && !confirming) render();
+    if (!whatsapp) {
+      try { whatsapp = (await api('/api/setup/whatsapp')).data; } catch { /* the WhatsApp page asks again */ }
+    }
+    // The WhatsApp page keeps itself up to date; drawing it again would only lose what is typed there.
+    if (settings && !busy && !confirming && !waUpdate) render();
   }
 
   (async () => {

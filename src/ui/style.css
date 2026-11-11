@@ -240,6 +240,14 @@ button.w95:disabled { color: var(--shadow); text-shadow: 1px 1px #fff; }
 .setup-buttons { display: flex; gap: 6px; padding: 6px; border-top: 1px solid var(--shadow); box-shadow: inset 0 1px #fff; }
 .setup-gap { flex: 1; }
 .setup-buttons button[hidden] { display: none; }
+.setup [hidden] { display: none !important; }
+.setup-confirm { margin: 6px 0; padding: 4px 6px; background: #fff3c4; border: 1px solid #806000; }
+.whatsapp-qr-wrap { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; margin: 6px 0; }
+.whatsapp-qr-wrap.off { display: none; }
+/* Shown pixel for pixel (never squeezed), so a phone reads it easily. */
+.whatsapp-qr { flex: none; background: #fff; padding: 4px; box-shadow: var(--sunken); image-rendering: pixelated; }
+.whatsapp-code { font: bold 22px "Courier New", monospace; letter-spacing: 3px; margin: 4px 0; }
+.whatsapp-pairing.off { display: none; }
 
 /* ---------- taskbar ---------- */
 #taskbar {

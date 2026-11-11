@@ -37,7 +37,7 @@ function toolsFor(computer, scope) {
 
 export async function handleMcp(request, response, body, { computer, scope }) {
   const tools = toolsFor(computer, scope);
-  const server = new Server({ name: 'cinco-id', version: '2.5.0' }, { capabilities: { tools: {} } });
+  const server = new Server({ name: 'cinco-id', version: '2.5.1' }, { capabilities: { tools: {} } });
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
     tools: tools.map(tool => ({
       name: tool.name,

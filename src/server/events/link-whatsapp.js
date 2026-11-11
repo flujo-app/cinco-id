@@ -1,6 +1,7 @@
-// Prepares the link between the WhatsApp connector (mcp-whatsapp-web) and this computer, so
-// incoming calls pop up on screen. Makes a private shared secret once, stores it in
-// harness.config.json, and prints the three settings the WhatsApp connector needs.
+// The manual way: prepares the link between a WhatsApp connector (mcp-whatsapp-web) that another
+// program runs and this computer, so incoming calls pop up on screen. Makes a private shared
+// secret once, stores it in harness.config.json, and prints the three settings that connector
+// needs. (The usual way is "Link WhatsApp" in the Setup window, which needs none of this.)
 //
 //   npm run whatsapp:link            shows the settings with the secret hidden
 //   npm run whatsapp:link -- --show  shows the secret too (to copy it into the connector)
@@ -29,6 +30,7 @@ if (!/^whsec_/.test(saved.events.whatsapp.secret ?? '') || /</.test(saved.events
 const config = await loadConfig(rootDir, {}, { dataDir });
 const secret = saved.events.whatsapp.secret;
 
+console.log('This is the manual way. The Setup window can link WhatsApp by itself: say "link whatsapp" there.\n');
 console.log(created ? 'A new private secret was saved in harness.config.json.' : 'Using the secret already saved in harness.config.json.');
 console.log('\nGive the WhatsApp connector these three settings (in the "env" part of its entry), then restart it:\n');
 console.log(`  WHATSAPP_WEBHOOK_URL=http://127.0.0.1:${config.port}/hooks/whatsapp`);

@@ -1,8 +1,13 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
-/** The only keys the app keeps. */
+/** The keys people can type into the Setup window. */
 export const SECRET_NAMES = ['brain', 'openrouter'];
+/**
+ * Everything the app keeps: those keys, plus the private secret it makes itself for its own
+ * WhatsApp connector's call alerts ("whatsapp"), which nobody ever types or sees.
+ */
+export const KEPT_NAMES = [...SECRET_NAMES, 'whatsapp'];
 
 /** Which environment variable stands in for a key that is not stored. */
 export function secretEnvName(name, config) {
@@ -36,7 +41,7 @@ export class SecretStore {
     try {
       const saved = JSON.parse(await fs.readFile(this.file, 'utf8'));
       this.sealed = {};
-      for (const name of SECRET_NAMES) {
+      for (const name of KEPT_NAMES) {
         if (typeof saved.keys?.[name] === 'string' && saved.keys[name]) this.sealed[name] = saved.keys[name];
       }
     } catch { this.sealed = {}; }
@@ -52,7 +57,7 @@ export class SecretStore {
   }
 
   async set(name, value) {
-    if (!SECRET_NAMES.includes(name)) throw new Error('There is no such key.');
+    if (!KEPT_NAMES.includes(name)) throw new Error('There is no such key.');
     if (!this.canStore) throw Object.assign(new Error('Keys can only be stored by the desktop app. Use an environment variable instead.'), { status: 409 });
     this.sealed[name] = Buffer.from(this.cipher.encryptString(String(value))).toString('base64');
     await this.save();

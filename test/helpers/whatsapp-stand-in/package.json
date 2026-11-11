@@ -1,0 +1,11 @@
+{
+  "name": "mcp-whatsapp-web",
+  "version": "1.4.2",
+  "description": "A stand-in for the WhatsApp connector, for CINCO ID's tests only. It never talks to WhatsApp.",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "prepare": "node build.mjs"
+  }
+}

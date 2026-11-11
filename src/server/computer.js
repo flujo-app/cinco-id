@@ -258,7 +258,7 @@ export class Computer extends EventEmitter {
       case 'focus': this.focus = command.sequence.key; return;
       case 'list': return this.list(command.what);
       case 'mute': return this.send({ type: 'quiet' });
-      case 'setup': this.send({ type: 'setup.open' }); return this.say('setupOpen');
+      case 'setup': this.send({ type: 'setup.open', page: command.page ?? null }); return this.say('setupOpen');
       case 'music': this.send({ type: 'music', on: command.on }); return this.say('ok');
       case 'voice.list': return this.listVoices();
       case 'voice.use': return this.useVoice(command.name);
@@ -692,23 +692,24 @@ export class Computer extends EventEmitter {
       kind: 'call',
       title: call.isVideo ? 'Incoming video call' : 'Incoming call',
       call: { ...call, caller },
-      canDecline: Boolean(call.test || this.connectors?.canDeclineCalls?.()),
+      canDecline: Boolean(call.test || this.connectors?.canDeclineCalls?.(call.via)),
     });
     this.calls.set(call.callId, { ...call, caller, windowId: window.id });
     this.send({ type: 'sound', name: 'ring' });
     // Make sure the Decline button tells the truth: is the connector really there right now?
     if (!call.test && this.connectors?.checkDecline) {
-      this.connectors.checkDecline().catch(() => false).then(() => this.declineAvailabilityChanged());
+      this.connectors.checkDecline(call.via).catch(() => false).then(() => this.declineAvailabilityChanged());
     }
     return this.say(call.isVideo ? 'videoCalling' : 'calling', { caller });
   }
 
   /** The connector that declines calls came or went: the call windows follow. */
   declineAvailabilityChanged() {
-    const can = Boolean(this.connectors?.canDeclineCalls?.());
     const changed = [];
     for (const window of this.windows.values()) {
-      if (window.kind !== 'call' || window.call.test || window.canDecline === can) continue;
+      if (window.kind !== 'call' || window.call.test) continue;
+      const can = Boolean(this.connectors?.canDeclineCalls?.(window.call.via));
+      if (window.canDecline === can) continue;
       window.canDecline = can;
       changed.push({ id: window.id, canDecline: can });
     }
@@ -731,7 +732,7 @@ export class Computer extends EventEmitter {
     const call = callId ? this.calls.get(callId) : [...this.calls.values()].at(-1);
     if (!call) return this.say('noCall');
     if (!call.test) {
-      try { await this.connectors?.declineCall?.(call.callId); } catch (error) {
+      try { await this.connectors?.declineCall?.(call.callId, call.via); } catch (error) {
         this.send({ type: 'note', level: 'error', text: `Could not decline: ${error.message}` });
         return;
       }

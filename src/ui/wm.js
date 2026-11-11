@@ -9,7 +9,7 @@ const SIZES = {
   printout: [300, 400],
   note: [350, null],
   progress: [330, null],
-  setup: [560, 384],
+  setup: [580, 420],
 };
 const TITLE_H = 22;
 const WINDOW_EFFECTS = new Set(['drift', 'conga', 'giant', 'tiny', 'free']);
@@ -140,7 +140,8 @@ export class WindowManager {
     if (!record) return;
     for (const other of this.windows.values()) other.frame.classList.toggle('active', other === record);
     // The console, questions and calls always stay above the dancers, however many there are.
-    const layer = { console: 1_000_000, dialog: 3_000_000, call: 2_000_000, setup: 2_500_000 }[record.desc.kind] ?? 0;
+    // A call even comes in front of the Setup window (so "Test call window" there is seen).
+    const layer = { console: 1_000_000, dialog: 3_000_000, call: 2_700_000, setup: 2_500_000 }[record.desc.kind] ?? 0;
     record.frame.style.zIndex = String(layer + ++this.z);
   }
 

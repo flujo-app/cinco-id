@@ -147,6 +147,7 @@ const builders = {
       shell,
       sound,
       firstRun: desc.firstRun,
+      page: desc.page ?? null,
       close: () => wm.close('setup', { byHand: true }),
       onFinished: saved => setupClosed(desc.firstRun, saved),
     });
@@ -242,10 +243,14 @@ const wm = new WindowManager({
 
 let setupPending = false; // the first start: the greeting waits until Setup is closed
 
-function showSetup({ firstRun = false } = {}) {
+function showSetup({ firstRun = false, page = null } = {}) {
   const existing = wm.windows.get('setup');
-  if (existing) { wm.minimise(existing, false); return; }
-  wm.open({ id: 'setup', kind: 'setup', title: 'CINCO ID Setup', firstRun }, { instant: true });
+  if (existing) {
+    wm.minimise(existing, false);
+    if (page) existing.goTo?.(page);
+    return;
+  }
+  wm.open({ id: 'setup', kind: 'setup', title: 'CINCO ID Setup', firstRun, page }, { instant: true });
 }
 
 async function setupClosed(firstRun, saved) {
@@ -337,7 +342,10 @@ function handle(action) {
       break;
     }
     case 'setup.open':
-      showSetup();
+      showSetup({ page: action.page ?? null });
+      break;
+    case 'whatsapp':
+      wm.windows.get('setup')?.whatsappChanged?.(action);
       break;
     case 'call.decline-state':
       for (const { id, canDecline } of action.windows) {
