@@ -78,6 +78,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--model", default=S.SEEDANCE_MODEL, help="OpenRouter catalogue id for --engine openrouter")
     parser.add_argument("--resolution", default="480p", help="OpenRouter size name, checked against the catalogue")
     parser.add_argument("--only", help="comma-separated sequence ids to do, e.g. tayne/nude,oyster")
+    parser.add_argument("--work", help="folder that keeps each raw paid result, so finishing can be redone for free")
     parser.add_argument("--stills", action="store_true", help="make the still pictures instead of the dances")
     parser.add_argument("--yes", action="store_true", help="really do it (this spends money)")
     args = parser.parse_args(argv)
@@ -111,9 +112,11 @@ def main(argv: list[str] | None = None) -> int:
     for step in steps:
         entry = by_id[step["id"]]
         emit(sequence=entry["id"], message=f"Starting {entry['name']}")
-        process = subprocess.Popen(command(entry, root / Path(entry["id"]), args.engine, args.resolution,
-                                           args.stills, step["costUsdEstimate"] * 1.5 + 0.25, args.model),
-                                   stdout=subprocess.PIPE, text=True, encoding="utf-8", cwd=REPO_ROOT)
+        arguments = command(entry, root / Path(entry["id"]), args.engine, args.resolution,
+                            args.stills, step["costUsdEstimate"] * 1.5 + 0.25, args.model)
+        if args.work:
+            arguments += ["--work", str(Path(args.work).resolve() / entry["id"].replace("/", "-"))]
+        process = subprocess.Popen(arguments, stdout=subprocess.PIPE, text=True, encoding="utf-8", cwd=REPO_ROOT)
         last = {}
         for line in process.stdout:
             try:

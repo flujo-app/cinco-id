@@ -17,12 +17,17 @@ from PIL import Image, ImageFilter
 # Flat backdrop colours offered to the motion model; the one furthest from the
 # character's own colours is used so the cut-out never eats into the figure.
 KEY_COLORS = {
-    "magenta": (255, 0, 255),
-    "green": (0, 200, 0),
+    "grey": (128, 128, 128),
     "blue": (0, 60, 255),
+    "green": (0, 200, 0),
+    "magenta": (255, 0, 255),
     "orange": (255, 140, 0),
     "white": (245, 245, 245),
 }
+# Tried in this order. Video models paint a thin halo in the opposite colour next to a
+# bright backdrop (green fingertips beside magenta), so a neutral grey comes first and
+# loud colours are only used when the figure itself is grey.
+KEY_PREFERENCE = ["grey", "blue", "green", "magenta", "orange", "white"]
 
 
 # --- small helpers -------------------------------------------------------------
@@ -62,10 +67,14 @@ def choose_key_color(rgb: np.ndarray, alpha: np.ndarray) -> tuple[str, tuple[int
     if len(pixels) > 20000:
         pixels = pixels[np.linspace(0, len(pixels) - 1, 20000).astype(int)]
     best, best_score = None, -1.0
-    for name, color in KEY_COLORS.items():
-        distance = np.linalg.norm(pixels - np.array(color, np.float32) / 255.0, axis=1)
-        # Share of figure pixels that are clearly different from this colour.
-        score = float(np.mean(distance > 0.35)) + 0.001 * float(np.percentile(distance, 2))
+    for name in KEY_PREFERENCE:
+        distance = np.linalg.norm(pixels - np.array(KEY_COLORS[name], np.float32) / 255.0, axis=1)
+        clash = float(np.mean(distance < 0.25))          # share of the figure close to this colour
+        # The cut-out model works on shapes, not colour contrast: grey still worked with 22%
+        # of a satin shirt close to it, while coloured backdrops tint shiny cloth and edges.
+        if clash < (0.25 if name == "grey" else 0.02):
+            return name, KEY_COLORS[name]
+        score = 1.0 - clash
         if score > best_score:
             best, best_score = name, score
     return best, KEY_COLORS[best]
@@ -211,8 +220,42 @@ def trust_color(rgb: np.ndarray, alpha: np.ndarray, background: np.ndarray) -> n
     """
     rgbf = to_float(rgb) if rgb.dtype == np.uint8 else rgb
     distance = np.linalg.norm(rgbf - background[None, None, :], axis=2)
-    from_color = np.clip((distance - 0.1) / 0.5, 0.0, 1.0)
+    # Only colours well away from the backdrop count: a half-and-half blur of skin and
+    # magenta is still close enough to the backdrop to keep the matte's own estimate.
+    from_color = np.clip((distance - 0.3) / 0.45, 0.0, 1.0)
     return np.where(alpha > 0.05, np.maximum(alpha, from_color), alpha).astype(np.float32)
+
+
+def inside_color(rgb: np.ndarray, alpha: np.ndarray, radius: int = 4) -> np.ndarray:
+    """Soft edge pixels take the colour of the solid figure right next to them.
+
+    In video frames the matte's softness on fast, blurred edges (fingers, flying
+    hair) is not reliable enough to un-mix the backdrop, which leaves green or
+    pink specks. The outline's shape still comes from alpha; only its colour is
+    borrowed from inside, so no new colour can appear.
+    """
+    solid = (alpha >= 0.98).astype(np.float32)
+    if not solid.any():
+        return rgb
+    borrowed = bleed_colors(rgb, solid, radius=radius)
+    reachable = blur(solid[..., None], radius)[..., 0] > 1e-3      # far-off wisps keep their own colour
+    soft = (alpha > 0.0) & (alpha < 0.98) & reachable
+    return np.where(soft[..., None], borrowed, rgb).astype(np.float32)
+
+
+def solid_inside(alpha: np.ndarray, depth: int = 4) -> np.ndarray:
+    """Everything well inside the outline is solid.
+
+    Shiny cloth can mirror the backdrop colour; the matte model then rates it as
+    partly see-through, and un-mixing the backdrop would stain it. Only the outer
+    few pixels of the outline keep the matte's soft values.
+    """
+    mask = Image.fromarray(((alpha > 0.5) * 255).astype(np.uint8))
+    mask = mask.filter(ImageFilter.MaxFilter(5)).filter(ImageFilter.MinFilter(5))   # close small holes
+    for _ in range(depth):
+        mask = mask.filter(ImageFilter.MinFilter(3))
+    inside = np.asarray(mask) > 0
+    return np.where(inside, 1.0, alpha).astype(np.float32)
 
 
 def shrink(alpha: np.ndarray, pixels: int = 1) -> np.ndarray:
@@ -232,11 +275,13 @@ def cutout(rgb: np.ndarray, alpha: np.ndarray, background: np.ndarray | None = N
         alpha = keep_main_figure(alpha)
     if key is not None:
         alpha = trust_color(rgb, alpha, background)
+        alpha = solid_inside(alpha)
     if erode:
         alpha = shrink(alpha, erode)
     color = decontaminate(rgb, alpha, background)
     if key is not None:
         color = despill(color, alpha, key)
+        color = inside_color(color, alpha)
     color = bleed_colors(color, alpha)
     return np.dstack([color, alpha]).astype(np.float32)
 
@@ -294,9 +339,10 @@ def hat_line(alpha: np.ndarray) -> float:
     solid = alpha > 0.5
     widths = solid.sum(axis=1).astype(np.float32)
     figure_h = bottom - top
-    search_end = top + max(2, int(figure_h * 0.35))
+    # Only the head area: elbows held out to the side can be wider than a hat brim.
+    search_end = top + max(2, int(figure_h * 0.2))
     peak = top + int(np.argmax(widths[top:search_end]))
-    limit = top + max(3, int(figure_h * 0.5))
+    limit = top + max(3, int(figure_h * 0.3))
     for row in range(peak, limit):
         if widths[row] < 0.6 * widths[peak]:
             return round(row / alpha.shape[0], 3)
@@ -313,13 +359,15 @@ def frame_difference(a: np.ndarray, b: np.ndarray) -> float:
 
 
 def make_loop(frames: list[np.ndarray], drop_last: bool = True, crossfade: int = 6,
-              tolerance: float = 2.0) -> tuple[list[np.ndarray], dict]:
+              tolerance: float = 2.0, force: bool = False) -> tuple[list[np.ndarray], dict]:
     """Turn a clip into a seamless loop.
 
     The motion model is asked to end on the same pose it starts with, so the
     final frame normally repeats the first and is dropped. If the remaining jump
     from last to first frame is still bigger than `tolerance` times an ordinary
-    frame-to-frame step, the tail is cross-faded into the opening frames.
+    frame-to-frame step (or `force` is set, for example when the pose matches but
+    the last frames are blurred and the first is sharp), the tail is cross-faded
+    into the opening frames.
     """
     if len(frames) < 3 * crossfade + 2:
         raise ValueError("The clip is too short to loop")
@@ -328,7 +376,7 @@ def make_loop(frames: list[np.ndarray], drop_last: bool = True, crossfade: int =
     typical = float(np.median(steps)) or 1e-6
     seam_before = frame_difference(clip[-1], clip[0])
     report = {"typicalStep": round(typical, 5), "seamBefore": round(seam_before, 5), "crossfadeFrames": 0}
-    if seam_before > tolerance * typical and crossfade > 0:
+    if crossfade > 0 and (force or seam_before > tolerance * typical):
         n = len(clip)
         tail = []
         for i in range(crossfade):

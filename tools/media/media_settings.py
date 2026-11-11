@@ -142,8 +142,8 @@ WAN_PREPARE_RATE = rate_per_second(None, 4, 16384)
 
 # Dance engines that run on our own Modal account (no other account or key needed),
 # with typical seconds of H200 time per clip including start-up and model loading.
-MODAL_DANCE_SECONDS = {"wan": 420, "ltx": 240}
-DEFAULT_ENGINE = "wan"
+MODAL_DANCE_SECONDS = {"ltx": 240, "wan": 460}
+DEFAULT_ENGINE = "ltx"   # chosen after a side-by-side test; see docs/MEDIA.md
 
 # Upper bound used before starting: art 240 s, motion 420 s, cut-out 240 s.
 WORST_CASE_USD = round(240 * ART_RATE + 420 * MOTION_RATE + 240 * ART_RATE, 2)

@@ -132,6 +132,33 @@ class FinishingTests(unittest.TestCase):
         self.assertGreater(g, b)                                 # ... and green above blue, not green-tinted
         self.assertEqual(rgba[15, 15, 3], 1.0)
 
+    def test_shiny_patch_inside_the_figure_is_not_stained(self):
+        magenta = np.array([1.0, 0.0, 1.0], np.float32)
+        rgb = np.zeros((60, 60, 3), np.uint8)
+        rgb[:] = (255, 0, 255)
+        rgb[10:50, 10:50] = (150, 150, 150)                        # grey satin shirt
+        rgb[25:35, 25:35] = (190, 140, 190)                        # ... mirroring the magenta backdrop
+        alpha = np.zeros((60, 60), np.float32)
+        alpha[10:50, 10:50] = 1.0
+        alpha[25:35, 25:35] = 0.7                                  # matte unsure about the shiny patch
+        rgba = F.cutout(rgb, alpha, magenta, key=magenta)
+        self.assertEqual(rgba[30, 30, 3], 1.0)
+        r, g, b = rgba[30, 30, :3]
+        self.assertGreater(r, g)                                   # still a pinkish reflection, never green
+        self.assertTrue(np.allclose(rgba[30, 30, :3], np.array([190, 140, 190]) / 255, atol=0.01))
+
+    def test_half_blurred_hand_is_not_made_solid(self):
+        magenta = np.array([1.0, 0.0, 1.0], np.float32)
+        skin = np.array([0.85, 0.62, 0.5], np.float32)
+        rgb = np.zeros((30, 30, 3), np.uint8)
+        rgb[:] = (255, 0, 255)
+        rgb[10:20, 10:20] = F.to_uint8(0.5 * skin + 0.5 * magenta)   # truly half see-through
+        alpha = np.zeros((30, 30), np.float32)
+        alpha[10:20, 10:20] = 0.5
+        rgba = F.cutout(rgb, alpha, magenta, key=magenta)
+        self.assertLess(rgba[15, 15, 3], 0.7)
+        self.assertLess(np.abs(rgba[15, 15, :3] - skin).max(), 0.06)  # the un-mixed colour is skin, not pink
+
     def test_green_halo_beside_magenta_is_removed(self):
         rgb = np.full((20, 20, 3), (0.9, 0.9, 0.85), np.float32)       # white boot ...
         rgb[:, 5] = (0.6, 0.9, 0.55)                                    # ... with a green halo on its edge
@@ -139,6 +166,16 @@ class FinishingTests(unittest.TestCase):
         alpha[:, 5:] = 1.0
         cleaned = F.despill(rgb, alpha, np.array([1.0, 0.0, 1.0], np.float32))
         self.assertLessEqual(cleaned[10, 5, 1], max(cleaned[10, 5, 0], cleaned[10, 5, 2]) + 1e-6)
+
+    def test_key_color_prefers_neutral_grey(self):
+        rgb = np.zeros((40, 40, 3), np.uint8)
+        rgb[:20] = (18, 163, 153)                    # teal suit
+        rgb[20:] = (217, 158, 128)                   # skin
+        name, _ = F.choose_key_color(rgb, np.ones((40, 40), np.float32))
+        self.assertEqual(name, "grey")
+        rgb[:] = (120, 122, 125)                     # a grey suit clashes with grey
+        name, _ = F.choose_key_color(rgb, np.ones((40, 40), np.float32))
+        self.assertEqual(name, "blue")
 
     def test_key_color_avoids_figure_colours(self):
         rgb = np.zeros((40, 40, 3), np.uint8)

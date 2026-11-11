@@ -1,0 +1,294 @@
+# Media generator
+
+The media generator makes the see-through dancing clips and still pictures that the computer shows instead of
+the simple drawn puppets. It writes exactly the files described in [PROJECTS.md](PROJECTS.md). The finished demo
+cast is already in the repository, so nobody needs any account or key to enjoy the demo.
+
+## Three ways to make the dance
+
+| | Self-hosted on Modal (default) | MiniMax through OpenRouter | Seedance through OpenRouter |
+|---|---|---|---|
+| What it is | Open video model on our own rented cloud graphics card: **LTX-2.5** (default) or **Wan2.2** | `minimax/hailuo-3-max`, a hosted model, paid per clip | `bytedance/seedance-2.5`, a hosted model, paid per clip |
+| What you need | A Modal account (`modal setup`) | Modal account + an OpenRouter key | Modal account + an OpenRouter key |
+| Cost per new dancer | **about $0.35** with LTX, about $0.80 with Wan (measured) | about **$0.31** at 480p, $0.46 at 768p (computed) | about **$0.59** at 480p, $1.23 at 720p (computed) |
+| Time per new dancer | about 6 minutes with LTX, 10 with Wan | not measured | not measured |
+| Tried for real | Yes | No paid test: the request is checked against the live catalogue only | No paid test: the request is checked against the live catalogue only |
+
+Pictures and background removal always run on Modal with pinned open models, whichever dance route you pick.
+The "cost per new dancer" above includes those Modal steps (drawing about $0.03, cut-out about $0.03).
+
+**Why OpenRouter is not the default:** ByteDance and MiniMax do not let anyone run these two hosted models
+themselves, and the owner wants new dancers to be possible without an OpenRouter account. The OpenRouter key is
+read **only** from the `OPENROUTER_API_KEY` environment variable, which the owner sets when he wants to use it.
+
+## How a dancer is made
+
+1. **Draw the character.** Z-Image-Turbo draws a realistic, invented person standing in a ready-to-dance pose
+   on a plain grey backdrop, in an early-1990s public-access TV look. Expression pictures (`smiling`) are redrawn
+   from that picture with a small change. A variant can be "re-dressed" from another sequence's picture
+   (`--like`), which keeps the same face, build, pose and hat.
+2. **Cut it out.** BiRefNet finds the figure. The cut-out is cleaned (haze, specks and backdrop-coloured edges
+   removed) and placed on a 3:4 portrait canvas with empty space around it and the feet always at the same height.
+   This becomes `keyframe.png` (full size, 834 by 1112) and `still.png` (540 by 720).
+3. **Choose a backdrop colour.** The figure is put on a flat **grey** backdrop unless more than a quarter of it is
+   close to grey; then blue, green, magenta, orange or white, whichever the figure does not contain. Grey comes
+   first because video models paint a thin halo in the opposite colour next to a bright backdrop (yellow-green
+   fingertips beside magenta) and mirror bright backdrops in shiny cloth (rainbow streaks on satin). The cut-out
+   model works on shapes, not colour contrast, so grey works even behind a grey satin shirt. `--backdrop` forces
+   a colour.
+4. **Dance (the loop trick).** The video model gets that same picture as the **first and the last frame**, so the
+   dance ends in the pose it started in. That is what makes the loop seamless. All three routes use this trick.
+5. **Cut out every frame.** BiRefNet again, then: everything well inside the outline counts as solid (so shiny
+   cloth that mirrors the backdrop is not stained), pixels clearly unlike the backdrop are kept solid, specks are
+   dropped, the outline is pulled in by one pixel, and the soft outer edge takes its colour from the solid figure
+   right next to it, so no backdrop colour or halo can show at the edge.
+6. **Loop.** The repeated last frame is dropped. If the jump from last to first frame is still clearly bigger
+   than an ordinary frame-to-frame step, the last six frames are blended into the first ones. `--crossfade N`
+   forces such a blend. It was tried on Oyster (motion-blurred last frames, sharp first frame) and rejected: when
+   the figure moves fast the blend shows double images, which looks worse than the small sharpness jump. None of
+   the shipped clips needed a blend.
+7. **Save.** `loop.webm` (VP9 with a see-through background, `yuva420p`), the stills and `media.json` (written
+   last). `hatLine` is measured from the cut-out on the still and on every sixth frame of the clip, so the hat
+   stays above it in nearly every frame. This works well for wide hats; for a bare head it tends to land at the
+   shoulders, so check it by eye. The folder is then checked against the contract.
+
+## Comparison on the same Tayne picture (2026-11-11)
+
+Both clips came from the identical picture, prompt and seed. Frames were inspected full size.
+
+| | LTX-2.5 (chosen) | Wan2.2 A14B, normal prompt | Wan2.2 A14B, "big energetic" prompt |
+|---|---|---|---|
+| Movement | A clear strut: hips, shoulders and steps | Barely moves, a small sway (about a quarter of LTX's movement) | Big moves, but falls apart |
+| Face and hands | Natural; fingers a little soft | Crisper and the most natural | Face smears in fast moves |
+| Hat | Stays on, wobbles with the head | Stays on | Slides off and drops, which ruins "hat wobble" |
+| Fabric | Sequins a little glossy and smooth | Sharpest sequins | Smeared in crouches |
+| Clean cut-out | Yes (after the edge clean-up above) | Yes | Mostly; motion blur at the edges |
+| Smoothness | 24 frames per second | 16 frames per second | 16 frames per second |
+| Graphics-card time | 174 s, **$0.28** | 460 s, $0.74 | 448 s, $0.72 |
+
+**Verdict:** LTX-2.5 gives the best dancing for the joke at well under half the cost, so it is the default.
+Wan2.2 stays available (`--engine wan`) because it looks a little more lifelike when the moves are small.
+A Seedance or MiniMax clip was not made, because no paid OpenRouter request was allowed in this work; the owner
+can make the same comparison with one command (see "Making the cast").
+
+## MiniMax-H3 open weights: not used
+
+MiniMax published open weights (`MiniMaxAI/MiniMax-H3`, revision `0919fb684102ef115126612f3fbb84d1027e7317`,
+ungated). They were checked and deliberately **not** downloaded or used:
+
+- **Licence.** The MiniMax H3 Community License only applies outside its "Excluded Territories": the **United
+  States, the European Union, the United Kingdom and South Korea**. It forbids using, reproducing or displaying
+  the model **or its outputs** there (section V.4 and Exhibit A, item 1). Modal's graphics cards run in the United
+  States by default, and the clips would be stored on GitHub. Private use and shipping clips in a private repo are
+  therefore **not** clearly allowed for this project. It could only be considered if the owner confirms that he,
+  the cloud machines (a non-US Modal region) and the storage are all outside those territories.
+- **Size and hardware.** The first-and-last-frame variant (`FL2VA/`) needs **144 GB**: a 33-billion-parameter
+  video transformer (66.3 GB), a Qwen3-VL-32B text encoder (66.7 GB), a video decoder (10.4 GB) and an audio
+  decoder (0.6 GB). MiniMax's own example serves it on 4 graphics cards; on one H200 the encoder and the
+  transformer would have to be loaded one after the other.
+- **What the missing step would cost on Modal** (computed, not run): downloading and checking the 144 GB on a
+  CPU machine about $0.08 (about 15 minutes); one 5-second loop on one H200 about 10 to 12 minutes, about
+  $1.00 to $1.20 (about 2.5 minutes loading 143 GB, 6 to 8 minutes generating at 768 pixels, decoding). Total
+  about **$1.30**, which would fit in what is left of the $10 cap if the owner decides the licence allows it.
+- Note that the hosted `minimax/hailuo-3-max` on OpenRouter is described as derived from MiniMax H3. Using it is
+  governed by OpenRouter's and the provider's terms, not by the open-weights licence, but the owner may want to
+  check that too.
+
+## Models (pinned)
+
+| Role | Model | Revision | Licence |
+|---|---|---|---|
+| Picture | [`Tongyi-MAI/Z-Image-Turbo`](https://huggingface.co/Tongyi-MAI/Z-Image-Turbo) | `f332072aa78be7aecdf3ee76d5c247082da564a6` | Apache-2.0 |
+| Cut-out | [`ZhengPeng7/BiRefNet-matting`](https://huggingface.co/ZhengPeng7/BiRefNet-matting) | `eccde0a8cbdce7ac5fecfeb06340fe7b949e85d9` | MIT |
+| Dance (default) | [`Lightricks/LTX-2.5`](https://huggingface.co/Lightricks/LTX-2.5) with code [`Lightricks/LTX-2`](https://github.com/Lightricks/LTX-2) at `a95ab856bf29407b6b066ede0abe1846050db56c` | `5e6e71018ee1756ed329b697a7b4aedc934dfce9` | LTX-2.x Community License: free for people and companies under USD 10M yearly revenue and for hobby use; published outputs must be marked as machine-made |
+| Dance (option) | [`Wan-AI/Wan2.2-I2V-A14B-Diffusers`](https://huggingface.co/Wan-AI/Wan2.2-I2V-A14B-Diffusers) | `596658fd9ca6b7b71d5057529bbf319ecbc61d74` | Apache-2.0 |
+
+All weights come from the publisher's or author's own account. Every large file is checked against its published
+SHA-256 checksum when it is downloaded (Wan's 30 files are listed in `tools/media/wan_files.json`). LTX's six files
+(74.5 GiB) are read **read-only** from a verified cache volume of another project of the same account
+(`morriton-ltx-2-5-model-cache`), so they did not have to be downloaded again; the code checks their sizes and the
+cache's checksum record against the pins. `media.json` records each model, revision and licence in
+`provenance.models`, the hosted model (if one was used) by its dated catalogue name, and marks the media as
+machine-made.
+
+Cloud storage used: `beta-sequence-art-weights` (picture and cut-out models, 34 GB) and `beta-sequence-wan-weights`
+(Wan2.2, 126 GB). Both can be deleted with `modal volume delete <name>` if no longer wanted; they are downloaded
+again automatically when needed.
+
+## Setup (once)
+
+Needs Python 3.12 or newer with `modal`, `numpy` and `Pillow`, `ffmpeg`/`ffprobe` on the PATH, and a signed-in
+Modal profile. On Windows set `PYTHONUTF8=1`.
+
+```powershell
+pip install modal numpy Pillow
+$env:PYTHONUTF8 = "1"
+python tools/media/generate.py --prepare
+```
+
+`--prepare` builds the cloud software, downloads the picture, cut-out and Wan models (about 160 GB in total,
+checksums verified, about 20 minutes, about $0.10), and checks every toolset without using a graphics card.
+Finished steps are skipped when it is run again.
+
+## Making a dancer
+
+```powershell
+python tools/media/generate.py --name "Tayne" `
+  --prompt "Tayne: a flamboyant stage entertainer ... Dance: a confident strut on the spot ..." `
+  --out projects/4d3d3d3/sequences/tayne --expressions smiling --seed 9002
+```
+
+- `--prompt` describes the person and the dance in plain words: what they look like, then "Dance: ...".
+- `--expressions` can be repeated or comma-separated. Each one becomes `<name>.png`.
+- `--seed` makes a result repeatable. Without it, the seed comes from the name.
+- `--engine ltx` (default), `wan` or `openrouter` (`seedance` also works). With `openrouter`, `--model` picks any
+  model in OpenRouter's video catalogue that accepts a first and a last frame (default `bytedance/seedance-2.5`;
+  `minimax/hailuo-3-max` is the other one checked) and `--resolution` picks its size (default `480p`, which is
+  already 720 pixels tall after shaping).
+- `--dry-run` checks the request (for OpenRouter against the live public catalogue) and prints the expected cost.
+  It spends nothing and needs no key.
+- `--stills-only` makes only the pictures; `--from-still` dances the existing `keyframe.png` in `--out`.
+- `--like <folder>` (with `--like-strength`, `--like-tint`) re-dresses another sequence's character.
+- `--max-cost` (default $1.50) refuses to start if one dancer could cost more; `--hosted-cap` (default $5) refuses
+  any OpenRouter clip that would take the total OpenRouter spending in the local ledger past that amount.
+- `--work <folder>` keeps the raw paid results, so the finishing steps can be redone later for free.
+
+While it works it prints one JSON line per step, for example
+`{"stage": "motion", "progress": 0.3, "message": "Teaching the character to dance ..."}`, and finishes with
+`{"done": true, "media": "C:\\...\\media.json", "costUsdEstimate": 0.35}`. If anything fails it prints
+`{"error": "<plain reason>"}` and exits with a non-zero code. Nothing is left running in the cloud either way:
+the cloud app only exists while the command runs, every function scales to zero, at most one machine runs, and
+nothing is retried automatically. An OpenRouter clip is requested exactly once and never re-sent, even after an
+unclear answer, so it can never be paid for twice by accident; the key is only ever sent to the OpenRouter API
+address.
+
+Every run is added to `.local/media-ledger.jsonl` (not committed) with its cost per step.
+
+## Making the cast
+
+The cast (names, descriptions, seeds) is in `tools/media/cast.json`. `make_cast.py` makes all of it in one go and
+always prints the plan and total cost first. Without `--yes` it does nothing else.
+
+```powershell
+python tools/media/make_cast.py --stills --yes                     # the pictures
+python tools/media/make_cast.py --engine ltx --yes                 # the dances, on Modal
+python tools/media/make_cast.py --engine openrouter --model bytedance/seedance-2.5 --resolution 480p
+python tools/media/make_cast.py --engine openrouter --model minimax/hailuo-3-max --resolution 480p
+```
+
+To compare a hosted model on Tayne alone once the owner has set the key (about $0.59 for Seedance, $0.31 for
+MiniMax), without touching the shipped clip:
+
+```powershell
+$env:OPENROUTER_API_KEY = "<the owner's key>"
+mkdir C:\temp\tayne-hosted; copy projects\4d3d3d3\sequences\tayne\keyframe.png C:\temp\tayne-hosted\
+python tools/media/generate.py --name Tayne --prompt "<Tayne's prompt from cast.json>" --seed 9002 `
+  --out C:\temp\tayne-hosted --from-still --engine openrouter --model minimax/hailuo-3-max
+```
+
+## Cost details
+
+**Modal** (published prices, [modal.com/pricing](https://modal.com/pricing), checked 2026-11-10). Costs are the
+seconds each cloud step takes, measured from this computer (start-up and model loading included), times the price
+of the resources requested:
+
+| Step | Machine | Price per second | Typical |
+|---|---|---|---|
+| Draw + cut out stills | L40S, 4 cores, 32 GiB | $0.000665 | 40 to 60 s, $0.03 to $0.04 |
+| Dance, LTX-2.5 | H200, 4 cores, 128 GiB | $0.001598 | 166 to 174 s, $0.27 to $0.28 |
+| Dance, Wan2.2 | H200, 4 cores, 128 GiB | $0.001598 | 448 to 460 s, $0.72 to $0.74 |
+| Cut out every frame | L40S, 4 cores, 32 GiB | $0.000665 | 46 to 60 s, $0.03 to $0.04 |
+| Downloads and checks | 2 to 4 cores, no graphics card | $0.00004 to $0.00009 | |
+
+**OpenRouter** (live public catalogue `GET https://openrouter.ai/api/v1/videos/models`, read 2026-11-11; the tool
+reads it again before every clip):
+
+- `bytedance/seedance-2.5`: $0.0000107 per "video token", silent. Video tokens = width × height × 24 frames per
+  second × seconds ÷ 1024. This formula reproduces the model page's headline "from $0.1028/second" exactly
+  (480 × 854 × 24 ÷ 1024 = 9,607.5 tokens a second). For our 3:4 portrait, 5 seconds:
+  480p (560 × 752) = 49,350 tokens = **$0.528**; 720p (834 × 1112) = 108,681 tokens = **$1.163**.
+- `minimax/hailuo-3-max`: $0.05 a second at 480p and $0.08 a second at 768p. 5 seconds: **$0.25** at 480p,
+  **$0.40** at 768p.
+- Whole cast of four loops (dance step only; add about $0.04 of Modal cut-out per loop):
+  Seedance **$2.11** at 480p or **$4.65** at 720p; MiniMax **$1.00** at 480p or **$1.60** at 768p.
+
+## The demo cast in this repository
+
+| Sequence | Who | Dance route | Backdrop | `hatLine` | Clip cost |
+|---|---|---|---|---|---|
+| `celery-man` | Awkward office worker, grey suit, celery-green tie | LTX-2.5 | blue | 0.28 (chin, set by eye) | $0.37 |
+| `oyster` | Cheerful person, pearl-grey satin shirt, pearl necklace; has `smiling.png` | LTX-2.5 | grey | 0.29 (chin, set by eye) | $0.31 |
+| `tayne` | Flamboyant entertainer, teal sequins, huge navy hat, white boots; has `smiling.png` | LTX-2.5 | magenta | 0.273 (hat brim, measured) | $0.35 |
+| `tayne/nude` | Same Tayne in a silly beach costume: lime-green sling swimsuit, a rubber-duck swim ring around the hips, same hat and boots | LTX-2.5 | blue | 0.25 (hat brim, set by eye) | $0.33 |
+| `celery-head` | Bonus: the earlier cartoon figure with a celery head | LTX-2.5 | magenta | 0.27 (measured) | $0.34 |
+
+All clips are 4.0 s loops at 24 frames per second, 540 × 720 (celery-head 480 × 720), 0.5 to 1.3 MB, VP9 with a
+see-through background. Every folder passes the contract check. The beach costume was redrawn from Tayne's own
+picture (same face, hat and pose); a tight bodysuit and a plain swimsuit were rejected because the fabric showed
+body contours, and the swim ring was added so nothing could read as suggestive in any frame.
+
+Known weak spots, all from the video model itself: Celery Man's baggy trousers bend oddly at the knee in a few
+frames; Tayne and beach Tayne have small coloured specks on fast-moving fingertips (made before the grey backdrop
+rule); Oyster's face blurs in fast moves, and the blur stops abruptly where his loop restarts. `smiling.png` for the cast are redrawn pictures, so the face differs a
+little from `still.png`.
+
+## Ledgers for this work
+
+**OpenRouter (Seedance, MiniMax): $0.00.** No paid request was made; only the free public catalogue was read.
+The key was never looked up, read, used or written anywhere.
+
+**Modal: about $5.31 of the $10 cap.** $5.02 is measured by the tool (seconds × published price, listed below,
+times in UTC on 2026-11-11). Two amounts are estimates because the tool could not measure them: the stopped
+stylised Oyster run (the cloud app lived 119 s; at most $0.19) and building the cloud software images (about
+$0.10).
+
+| What | Steps | Cost |
+|---|---|---|
+| One-time downloads and checks | picture and cut-out models (282 s), Wan2.2 (754 s), tool checks | $0.085 |
+| Stylised cast, first plan | Celery-head cartoon (kept as bonus) | $0.344 |
+| | Stylised Oyster, stopped during its dance when the plan changed | ≤ $0.19 (estimate) |
+| Realistic pictures | 4 cast pictures | $0.127 |
+| | 3 redraws of the costume variant (bodysuit, then baggy suit) | $0.094 |
+| | 3 drafts of the beach costume (2 rejected, 1 kept) | $0.088 |
+| Route comparison on Tayne | LTX-2.5 | $0.311 |
+| | Wan2.2, normal prompt | $0.766 |
+| | Wan2.2, energetic prompt | $0.751 |
+| Cast loops | Beach-costume Tayne | $0.304 |
+| | Celery Man, first take (magenta backdrop, pink hands; replaced) | $0.324 |
+| | Oyster, first take (magenta backdrop, stained sleeves; replaced) | $0.369 |
+| | Tayne, re-made because the saved raw results were wiped from the temporary folder | $0.309 |
+| | Celery Man, final | $0.342 |
+| | Oyster, second take (blue backdrop, rainbow satin; replaced) | $0.528 |
+| | Oyster, final (grey backdrop) | $0.278 |
+| Software images | first build, then the Wan layer | about $0.10 (estimate) |
+| **Total** | | **about $5.31** |
+
+The local record of every measured step is `.local/media-ledger.jsonl` while working; it is not committed.
+
+## Tests
+
+```powershell
+python -m unittest discover -s test/media -v
+```
+
+The tests need no cloud, no graphics card and no key. They check the `media.json` contract, the cut-out clean-up
+(backdrop tint, green halos, blurred hands), the loop step, the hat line, a real ffmpeg round trip that proves the
+see-through background survives VP9 encoding, and the OpenRouter route against a fake local server: request shape
+(same picture first and last, no audio), polling, download (the key is not sent to the storage server), refused
+and failed jobs (never re-sent), the time limit, the spending cap, and prices per token, per second and in cents.
+
+## Files
+
+| File | What it does |
+|---|---|
+| `tools/media/generate.py` | The command the app calls. Runs the steps and prints progress. |
+| `tools/media/make_cast.py` | Makes the whole demo cast from `cast.json`, cost first. |
+| `tools/media/cast.json` | The demo cast: names, descriptions, seeds. |
+| `tools/media/media_cloud.py` | The Modal app: software images, storage and the cloud steps. |
+| `tools/media/media_art.py` | Runs in the cloud: drawing (Z-Image-Turbo) and cut-out (BiRefNet). |
+| `tools/media/media_ltx.py` | Runs in the cloud: the LTX-2.5 dance. |
+| `tools/media/media_wan.py`, `wan_files.json` | Runs in the cloud: the Wan2.2 dance, and its pinned file list. |
+| `tools/media/media_hosted.py` | The OpenRouter route: catalogue check, price, one request, polling, download. |
+| `tools/media/media_finish.py` | Runs locally: cut-out clean-up, layout, loop, VP9 encode, hat line. |
+| `tools/media/media_contract.py` | Builds and checks `media.json` folders. |
+| `tools/media/media_settings.py` | Model pins, canvas sizes, machine sizes and prices. |

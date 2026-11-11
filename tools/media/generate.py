@@ -187,11 +187,16 @@ def png_bytes(rgb) -> bytes:
     return buffer.getvalue()
 
 
-def keyframe_on_backdrop(keyframe, size: tuple[int, int]):
+def keyframe_on_backdrop(keyframe, size: tuple[int, int], forced: str | None = None):
     """Keyframe composited onto the backdrop colour that is furthest from the figure's colours."""
     import media_finish as F
     figure = F.to_uint8(keyframe[..., :3])
-    key_name, key_color = F.choose_key_color(figure, keyframe[..., 3])
+    if forced:
+        if forced not in F.KEY_COLORS:
+            raise Failure(f"Unknown backdrop colour; choose one of {', '.join(F.KEY_COLORS)}")
+        key_name, key_color = forced, F.KEY_COLORS[forced]
+    else:
+        key_name, key_color = F.choose_key_color(figure, keyframe[..., 3])
     resized = keyframe if (keyframe.shape[1], keyframe.shape[0]) == size else F.resize_rgba(keyframe, size)
     return key_name, key_color, png_bytes(F.over_color(resized, key_color))
 
@@ -244,8 +249,17 @@ def load_keyframe(out: Path):
 
 
 # --- finishing ------------------------------------------------------------------------------
+def clip_hat_line(still, frames) -> float:
+    """Where the hat (or head) ends, so that it stays above the line in nearly every frame."""
+    import numpy as np
+    import media_finish as F
+    values = [F.hat_line(still[..., 3])] + [F.hat_line(frame[..., 3]) for frame in frames[::6]]
+    return round(float(np.percentile(values, 90)), 3)
+
+
+
 def finish(out: Path, video: bytes, alphas_npz: bytes, key_color, keyframe, expressions: list[str],
-           models: list[dict], prompts: dict, cost: float, extra: dict) -> Path:
+           models: list[dict], prompts: dict, cost: float, extra: dict, crossfade: int = 0) -> Path:
     import numpy as np
     import media_finish as F
     from media_contract import build_media, validate_folder, write_media
@@ -269,7 +283,7 @@ def finish(out: Path, video: bytes, alphas_npz: bytes, key_color, keyframe, expr
             backdrop = key
         cut = F.cutout(frame, frame_alpha, backdrop, key=key, erode=1)
         frames.append(F.resize_rgba(cut, (S.OUTPUT_WIDTH, S.OUTPUT_HEIGHT)))
-    looped, loop_report = F.make_loop(frames)
+    looped, loop_report = F.make_loop(frames, crossfade=crossfade or 6, force=bool(crossfade))
     seconds = len(looped) / fps
     if seconds > 6.0:
         looped = looped[:6 * fps]
@@ -282,7 +296,7 @@ def finish(out: Path, video: bytes, alphas_npz: bytes, key_color, keyframe, expr
         F.save_png(still, out / "still.png")
     media = build_media(
         width=S.OUTPUT_WIDTH, height=S.OUTPUT_HEIGHT, fps=fps, frames=len(looped), expressions=expressions,
-        hat_line=F.hat_line(still[..., 3]), models=models, prompts=prompts, cost_usd=cost,
+        hat_line=clip_hat_line(still, looped), models=models, prompts=prompts, cost_usd=cost,
         extra={**extra, "loop": loop_report, "clipBytes": clip["bytes"], "machineGenerated": True},
     )
     media_path = write_media(out, media)
@@ -337,7 +351,7 @@ def dry_run(args, engine: str, expressions: list[str], seed: int) -> dict:
     plan = SD.plan_clip(model, args.resolution)
     size = tuple(int(v) for v in plan["size"].split("x")) if plan["size"] else (S.KEYFRAME_WIDTH, S.KEYFRAME_HEIGHT)
     if out and (out / "keyframe.png").exists():
-        key_name, _, picture = keyframe_on_backdrop(load_keyframe(out), size)
+        key_name, _, picture = keyframe_on_backdrop(load_keyframe(out), size, args.backdrop)
     else:
         import numpy as np
         key_name, picture = "magenta", png_bytes(np.zeros((size[1], size[0], 3), np.uint8))
@@ -432,7 +446,7 @@ def generate(args: argparse.Namespace) -> dict:
         width, height = S.WAN_WIDTH, S.WAN_HEIGHT
     else:
         width, height = S.MOTION_WIDTH, S.MOTION_HEIGHT
-    key_name, key_color, picture = keyframe_on_backdrop(keyframe, (width, height))
+    key_name, key_color, picture = keyframe_on_backdrop(keyframe, (width, height), args.backdrop)
     prompts["motion"] = motion_prompt(args.prompt.strip().rstrip("."), key_name)
     if engine == "openrouter":
         progress("motion", 0.3, "Sending the picture to the video service (usually 1 to 4 minutes)")
@@ -484,7 +498,7 @@ def generate(args: argparse.Namespace) -> dict:
     cost = round(ledger["usd"], 2)
     media_path = finish(out, moved["video"], matted["alpha"], key_color, keyframe, expressions, models, prompts,
                         cost, {**extra, "seed": seed, "backdropForCutout": key_name,
-                               "seconds": round(time.monotonic() - started)})
+                               "seconds": round(time.monotonic() - started)}, args.crossfade)
     append_ledger({"time": datetime.now(timezone.utc).isoformat(), "name": args.name, "out": str(out),
                    "engine": engine, "seed": seed, "usd": round(ledger["usd"], 4), "steps": ledger["steps"]})
     return {"done": True, "media": str(media_path), "costUsdEstimate": cost}
@@ -533,6 +547,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--like", help="re-dress the character from this other sequence folder (same person and pose)")
     parser.add_argument("--like-strength", type=float, default=0.7, help="how much --like may change (0.3 to 0.9)")
     parser.add_argument("--like-tint", help="repaint the --like picture in this colour first, e.g. #e6c2a0")
+    parser.add_argument("--backdrop", help="force the flat backdrop colour for the dance: grey, blue, green, magenta, orange or white")
+    parser.add_argument("--crossfade", type=int, default=0,
+                        help="always blend this many frames across the loop seam (0 = only when needed)")
     parser.add_argument("--max-cost", type=float, default=1.5, help="refuse to start above this many US dollars")
     parser.add_argument("--prepare", action="store_true", help="download and check the tools only")
     parser.add_argument("--work", help="folder that keeps the raw paid results, so finishing can be redone for free")
