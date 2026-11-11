@@ -1,0 +1,5 @@
+{
+  "name": "Demo floor",
+  "description": "Pre-made cast for trying things out. Kick it up to fill the screen.",
+  "show": { "windows": 28, "effects": ["tumble"], "drift": true }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "beta-sequence",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A talking Win95-style computer that loads dancing sequences, opens far too many windows and can do real work.",
+  "main": "src/shell/main.js",
+  "scripts": {
+    "start": "electron .",
+    "overlay": "electron . --overlay",
+    "serve": "node src/server/main.js",
+    "test": "node --test \"test/*.test.js\"",
+    "test:ui": "node test/ui/run.mjs",
+    "whatsapp:link": "node src/server/events/link-whatsapp.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "ws": "^8.22.2"
+  },
+  "devDependencies": {
+    "electron": "^45.3.0",
+    "playwright-core": "^1.65.0"
+  }
+}

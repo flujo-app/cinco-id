@@ -1,0 +1,12 @@
+{
+  "name": "Oyster",
+  "aliases": ["oister", "oysters", "the oyster"],
+  "beta": false,
+  "hatLine": 0.28,
+  "expressions": ["smiling"],
+  "puppet": {
+    "rig": "shell",
+    "dance": "twist",
+    "style": { "shell": "#b9b3a6", "shellDark": "#8c8577", "inside": "#f3e9dc", "pearl": "#ffffff", "gloves": "#ffffff", "shoes": "#3a2a55" }
+  }
+}

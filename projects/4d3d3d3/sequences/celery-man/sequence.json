@@ -1,0 +1,12 @@
+{
+  "name": "Celery Man",
+  "aliases": ["celery", "celeryman", "salary man", "celery men", "sellery man"],
+  "beta": false,
+  "hatLine": 0.3,
+  "expressions": ["smiling"],
+  "puppet": {
+    "rig": "humanoid",
+    "dance": "shuffle",
+    "style": { "head": "celery", "suit": "#8d8f98", "shirt": "#f4f1e6", "tie": "#b0302a", "shoes": "#2a2320", "skin": "#9fcf62" }
+  }
+}
