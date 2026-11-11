@@ -189,6 +189,10 @@ test('incoming calls show who is calling and can be declined', async () => {
   assert.equal(lastSaid(), 'Paul, +15550100456 is video calling.');
   await computer.hear('test call from my wife');
   assert.equal(lastSaid(), 'Paul, My Wife is calling.');
+  // The computer cannot pick up. It says so, and the call keeps ringing.
+  await computer.hear('Computer, answer the call.');
+  assert.equal(lastSaid(), "I'm afraid I can't do that, Paul.");
+  assert.equal([...computer.windows.values()].filter(window => window.kind === 'call').length, 2);
   await computer.hear('decline');
   assert.equal(lastSaid(), 'Call declined.');
 });

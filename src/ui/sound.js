@@ -82,6 +82,7 @@ const SOUNDS = {
 };
 
 export function play(name) {
+  if (muted && name !== 'ring-stop') return; // muted means everything: voice, music and effects
   try { SOUNDS[name]?.(); } catch { /* sound is a nicety */ }
 }
 
@@ -149,8 +150,11 @@ let current = null;
 let mode = 'server';
 let muted = false;
 
+const spoken = []; // what was said aloud and how it went, for the voice check
+
 export function setVoiceMode(next) { mode = next; }
-export function setMuted(value) { muted = value; if (value) quiet(); }
+export function setMuted(value) { muted = value; if (value) { quiet(); play('ring-stop'); } }
+export function voiceLog() { return spoken.slice(-40); }
 
 function browserSpeak(text) {
   return new Promise(resolve => {
@@ -169,16 +173,20 @@ function browserSpeak(text) {
 
 async function serverSpeak(text) {
   const response = await fetch(`/api/tts?text=${encodeURIComponent(text)}`);
-  if (response.status !== 200) return browserSpeak(text);
+  if (response.status !== 200) {
+    await browserSpeak(text);
+    return 'the computer had no voice ready, so the browser voice was tried';
+  }
   const url = URL.createObjectURL(await response.blob());
-  await new Promise(resolve => {
+  const outcome = await new Promise(resolve => {
     const player = new Audio(url);
-    player.onended = resolve;
-    player.onerror = resolve;
-    current = { stop: () => { player.pause(); resolve(); } };
-    player.play().catch(resolve);
+    player.onended = () => resolve('played');
+    player.onerror = () => resolve('could not be played');
+    current = { stop: () => { player.pause(); resolve('stopped'); } };
+    player.play().catch(() => resolve('was not allowed to play'));
   });
   URL.revokeObjectURL(url);
+  return outcome;
 }
 
 async function drain() {
@@ -187,7 +195,10 @@ async function drain() {
   while (queue.length) {
     const text = queue.shift();
     duck(true);
-    try { await (mode === 'server' ? serverSpeak(text) : browserSpeak(text)); } catch { /* keep going */ }
+    let outcome;
+    try { outcome = (await (mode === 'server' ? serverSpeak(text) : browserSpeak(text))) ?? 'browser voice'; }
+    catch (error) { outcome = `failed: ${error.message}`; }
+    spoken.push({ text, outcome });
     current = null;
   }
   duck(false);

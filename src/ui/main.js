@@ -9,7 +9,7 @@ document.body.classList.toggle('overlay', overlay);
 if (query.has('silent')) sound.setMuted(true); // for tests: no voice, no music
 
 const stage = new Stage();
-window.betaSequence = { clipStatus }; // for the checks in test/ui
+window.betaSequence = { clipStatus, voiceLog: sound.voiceLog }; // for the checks in test/ui
 let socket = null;
 let operator = 'Operator';
 let voice = { speak: 'server', listen: false };
@@ -90,7 +90,9 @@ const builders = {
     decline.addEventListener('click', () => send({ type: 'call.decline', callId: call.callId }));
     const dismiss = el('button', 'w95', 'Dismiss');
     dismiss.addEventListener('click', () => wm.close(desc.id, { byHand: true }));
-    buttons.append(decline, dismiss);
+    const accept = el('button', 'w95', 'Accept');
+    accept.addEventListener('click', () => send({ type: 'call.accept', callId: call.callId }));
+    buttons.append(accept, decline, dismiss);
     record.body.append(row, buttons);
     record.cleanup = () => setTimeout(stopRingIfQuiet, 0);
   },
@@ -345,6 +347,7 @@ function handle(action) {
     case 'sound': sound.play(action.name); break;
     case 'quiet': sound.quiet(); break;
     case 'music': musicChoice = action.on ? 'on' : 'off'; updateMusic(); break;
+    case 'projects': drawIcons(action.projects); break;
     case 'note': logLine('system', action.text); break;
     case 'thinking': status(action.on ? 'Computing...' : ''); break;
     default: break;

@@ -33,6 +33,7 @@ export const DEFAULT_PHRASES = {
   missed: 'Missed call from {caller}.',
   declined: 'Call declined.',
   noCall: 'Nobody is calling, {operator}.',
+  cannotAnswer: "I'm afraid I can't do that, {operator}.",
   working: 'Working on it.',
   newBeta: '{operator}, I have a new BETA sequence.',
   generatorMissing: 'The sequence generator is not connected.',
@@ -256,7 +257,7 @@ export class Computer extends EventEmitter {
       case 'music': this.send({ type: 'music', on: command.on }); return this.say('ok');
       case 'voice.list': return this.listVoices();
       case 'voice.use': return this.useVoice(command.name);
-      case 'generate': return this.generate(command.prompt);
+      case 'generate': return this.generate(command.prompt, command.name);
       case 'project.create': return this.createProject(command.name);
       case 'call.test': return this.incomingCall({
         callId: `test-${this.now()}`, isVideo: command.video, test: true,
@@ -264,6 +265,7 @@ export class Computer extends EventEmitter {
       });
       case 'call.decline': return this.declineCall();
       case 'call.who': return this.whoIsCalling();
+      case 'call.accept': return this.acceptCall();
       default: return this.think(said);
     }
   }
@@ -618,14 +620,15 @@ export class Computer extends EventEmitter {
   async createProject(name, id = null) {
     const project = await this.library.createProject(name, id);
     this.currentProject = project.id;
+    this.send({ type: 'projects', projects: this.snapshot().projects });
     return this.say('projectCreated', { thing: project.id }, { thing: spellHex(project.id) });
   }
 
-  async generate(prompt) {
+  async generate(prompt, givenName = null) {
     if (!this.generator) return this.say('generatorMissing');
     const projectId = this.currentProject ?? this.config.defaultProject ?? [...this.library.projects.keys()][0];
     if (!projectId) return this.say('nothingLoaded');
-    const name = titleCase(prompt.split(' ').slice(0, 3).join(' '));
+    const name = titleCase(givenName || prompt.split(' ').slice(0, 3).join(' '));
     const place = await this.library.prepareSequence(projectId, name, { description: prompt });
     const jobId = `job${this.now()}`;
     const window = this.openWindow({ kind: 'progress', title: 'Beta sequence', jobId, text: 'Starting', value: 0 });
@@ -692,6 +695,12 @@ export class Computer extends EventEmitter {
     this.closeWindows(window => window.id === call.windowId);
     this.send({ type: 'sound', name: 'ring-stop' });
     return this.say('declined');
+  }
+
+  /** The computer can show and decline calls, but it cannot pick up. The call keeps ringing. */
+  acceptCall() {
+    if (!this.calls.size) return this.say('noCall');
+    return this.say('cannotAnswer');
   }
 
   whoIsCalling() {
