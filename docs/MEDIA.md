@@ -8,10 +8,10 @@ cast is already in the repository, so nobody needs any account or key to enjoy t
 
 | | Self-hosted on Modal (default) | MiniMax through OpenRouter | Seedance through OpenRouter |
 |---|---|---|---|
-| What it is | Open video model on our own rented cloud graphics card: **LTX-2.5** (default) or **Wan2.2** | `minimax/hailuo-3-max`, a hosted model, paid per clip | `bytedance/seedance-2.5`, a hosted model, paid per clip |
+| What it is | Open video model on our own rented cloud graphics card: **LTX-2.5** (default), **Wan2.2** or **MiniMax H3** | `minimax/hailuo-3-max`, a hosted model, paid per clip | `bytedance/seedance-2.5`, a hosted model, paid per clip |
 | What you need | A Modal account (`modal setup`); for LTX-2.5 also a free Hugging Face sign-in (without it, Wan2.2 is used) | Modal account + an OpenRouter key | Modal account + an OpenRouter key |
-| Cost per new dancer | **about $0.35** with LTX, about $0.80 with Wan (measured) | about **$0.31** at 480p, $0.46 at 768p (computed) | about **$0.59** at 480p, $1.23 at 720p (computed) |
-| Time per new dancer | about 6 minutes with LTX, 10 with Wan | not measured | not measured |
+| Cost per new dancer | **about $0.35** with LTX, about $0.80 with Wan, about $0.78 with MiniMax H3 (measured) | about **$0.31** at 480p, $0.46 at 768p (computed) | about **$0.59** at 480p, $1.23 at 720p (computed) |
+| Time per new dancer | about 6 minutes with LTX, 10 with Wan, 12 with MiniMax H3 | not measured | not measured |
 | Tried for real | Yes | No paid test: the request is checked against the live catalogue only | No paid test: the request is checked against the live catalogue only |
 
 Pictures and background removal always run on Modal with pinned open models, whichever dance route you pick.
@@ -68,31 +68,67 @@ Both clips came from the identical picture, prompt and seed. Frames were inspect
 
 **Verdict:** LTX-2.5 gives the best dancing for the joke at well under half the cost, so it is the default.
 Wan2.2 stays available (`--engine wan`) because it looks a little more lifelike when the moves are small.
-A Seedance or MiniMax clip was not made, because no paid OpenRouter request was allowed in this work; the owner
+A Seedance or hosted MiniMax (OpenRouter) clip was not made, because no paid OpenRouter request was allowed in
+this work (the self-hosted MiniMax H3 was tried later, see below); the owner
 can make the same comparison with one command (see "Making the cast").
 
-## MiniMax-H3 open weights: not used
+## MiniMax H3 (optional, `--engine h3`): test result (2026-11-11)
 
-MiniMax published open weights (`MiniMaxAI/MiniMax-H3`, revision `0919fb684102ef115126612f3fbb84d1027e7317`,
-ungated). They were checked and deliberately **not** downloaded or used:
+MiniMax published open weights, `MiniMaxAI/MiniMax-H3`. Its licence is the
+[MiniMax H3 Community License Agreement](https://huggingface.co/MiniMaxAI/MiniMax-H3/blob/0919fb684102ef115126612f3fbb84d1027e7317/LICENSE),
+which has its own regional terms; the owner has read them and accepted the licence for this project. Only the
+first-and-last-frame part (`FL2VA/`, 144 GB, 81 files) is needed: a 33-billion-parameter video model, a
+Qwen3-VL-32B text reader, a video decoder and a sound decoder.
 
-- **Licence.** The MiniMax H3 Community License only applies outside its "Excluded Territories": the **United
-  States, the European Union, the United Kingdom and South Korea**. It forbids using, reproducing or displaying
-  the model **or its outputs** there (section V.4 and Exhibit A, item 1). Modal's graphics cards run in the United
-  States by default, and the clips would be stored on GitHub. Private use and shipping clips in a private repo are
-  therefore **not** clearly allowed for this project. It could only be considered if the owner confirms that he,
-  the cloud machines (a non-US Modal region) and the storage are all outside those territories.
-- **Size and hardware.** The first-and-last-frame variant (`FL2VA/`) needs **144 GB**: a 33-billion-parameter
-  video transformer (66.3 GB), a Qwen3-VL-32B text encoder (66.7 GB), a video decoder (10.4 GB) and an audio
-  decoder (0.6 GB). MiniMax's own example serves it on 4 graphics cards; on one H200 the encoder and the
-  transformer would have to be loaded one after the other.
-- **What the missing step would cost on Modal** (computed, not run): downloading and checking the 144 GB on a
-  CPU machine about $0.08 (about 15 minutes); one 5-second loop on one H200 about 10 to 12 minutes, about
-  $1.00 to $1.20 (about 2.5 minutes loading 143 GB, 6 to 8 minutes generating at 768 pixels, decoding). Total
-  about **$1.30**, which would fit in what is left of the $10 cap if the owner decides the licence allows it.
-- Note that the hosted `minimax/hailuo-3-max` on OpenRouter is described as derived from MiniMax H3. Using it is
-  governed by OpenRouter's and the provider's terms, not by the open-weights licence, but the owner may want to
-  check that too.
+**How it runs.** With the official SGLang server (the image `lmsysorg/sglang`, pinned by its digest, SGLang
+0.5.21), which MiniMax names as its recommended way to run the model. MiniMax's own example uses 4 graphics cards;
+reading the SGLang code showed that one H200 is enough when the card has at least 120 GiB free: everything (about
+110 GiB) stays on the card, peak 122.9 GB measured. The server starts inside the cloud machine, makes one clip
+from the same picture as first and last frame, and is stopped again. The sound it also makes is dropped.
+
+**One Tayne loop**, from Tayne's own picture, description and seed 9002, at 768 by 1024 pixels, 4 seconds asked,
+50 steps, grey backdrop, then the normal cut-out, loop and see-through steps. The request uses the layout of
+MiniMax's own prompt guide for first-and-last-frame clips. It worked the first time.
+
+| | LTX-2.5 (shipped Tayne) | MiniMax H3 (test) |
+|---|---|---|
+| Movement | A clear strut: hips, shoulders and steps | A bouncy dance on the spot: arm pumps and knee bends; about 70% of LTX's movement (measured from the outline) |
+| Face and hands | Natural; fingers a little soft; a pink speck on a fingertip in some frames | Natural and steady; hands mostly loose fists, clean, no coloured specks |
+| Hat | Stays on, wobbles with the head | Stays on, wobbles a little |
+| Fabric | Sequins glossy and smooth | Crisper, more real sequin sparkle; boot laces visible |
+| Cut-out and loop | Clean; no visible seam | Clean; no visible seam (the jump back is a quarter of a normal frame step) |
+| Length | 4.0 s, 96 frames, 24 per second | 4.4 s, 106 frames, 24 per second |
+| Graphics-card time | 174 s | 436 s: 238 s starting and loading, 180 s making the clip (3.5 s per step), the rest decoding |
+| Cost of the dance | $0.28 | **$0.72** |
+| Cost per new dancer | about $0.35 | **about $0.78** (picture $0.03, dance $0.72, cut-out $0.03) |
+
+Things that make the comparison not perfectly even: the shipped Tayne was made on a magenta backdrop (before the
+grey-backdrop rule), which caused its fingertip speck; the H3 test used grey. SGLang hands the clip back as a
+compressed H.264 file (about 0.8 Mbit/s) where LTX hands back every frame without loss; no blockiness was visible
+at the final 540 by 720 size.
+
+**Verdict:** MiniMax H3 looks a little more lifelike in the details (sequins, boots, clean hands), but it dances a
+bit less, takes two and a half times the graphics-card time and costs over twice as much per dancer, and needs
+144 GB of model files. LTX-2.5 stays the default. H3 can be chosen with `--engine h3` when the details matter more
+than the price. The test files (the H3 loop, a still, a side-by-side video and H3's own clip with its sound) were
+given to the owner outside the repository; the shipped Tayne was not changed.
+
+**Using it:**
+
+```powershell
+python tools/media/generate.py --prepare --engine h3        # once: checks or downloads the 144 GB
+python tools/media/generate.py --name "Tayne" --prompt "..." --out <folder> --engine h3
+```
+
+- On the owner's account the files are already there: another of his projects has exactly this `FL2VA` folder in
+  the volume `savia-spot-minimax-h3-42ed227e` (made at revision `42ed227e`, whose 81 `FL2VA` files are
+  byte-for-byte the same as the pinned revision; MiniMax only changed the readme in between). It is mounted
+  **read-only** and never written. `--prepare --engine h3` reads every byte and compares all 81 checksums with the
+  pins (176 s, $0.03); every H3 run checks sizes and the copy's own download records again.
+- On any other account `--prepare --engine h3` downloads the 81 files into `beta-sequence-h3-weights` and checks
+  them: 144 GB, estimated 18 minutes and $0.20 (not measured, the owner did not need it). No sign-in is needed.
+- One H3 machine is limited to 700 seconds, so a single dance can never cost more than $1.16. Like everything
+  else it stops by itself, never retries and leaves nothing running.
 
 ## Models (pinned)
 
@@ -102,10 +138,11 @@ ungated). They were checked and deliberately **not** downloaded or used:
 | Cut-out | [`ZhengPeng7/BiRefNet-matting`](https://huggingface.co/ZhengPeng7/BiRefNet-matting) | `eccde0a8cbdce7ac5fecfeb06340fe7b949e85d9` | MIT |
 | Dance (default) | [`Lightricks/LTX-2.5`](https://huggingface.co/Lightricks/LTX-2.5) with code [`Lightricks/LTX-2`](https://github.com/Lightricks/LTX-2) at `a95ab856bf29407b6b066ede0abe1846050db56c` | `5e6e71018ee1756ed329b697a7b4aedc934dfce9` | LTX-2.x Community License: free for people and companies under USD 10M yearly revenue and for hobby use; published outputs must be marked as machine-made |
 | Dance (option) | [`Wan-AI/Wan2.2-I2V-A14B-Diffusers`](https://huggingface.co/Wan-AI/Wan2.2-I2V-A14B-Diffusers) | `596658fd9ca6b7b71d5057529bbf319ecbc61d74` | Apache-2.0 |
+| Dance (option) | [`MiniMaxAI/MiniMax-H3`](https://huggingface.co/MiniMaxAI/MiniMax-H3), folder `FL2VA`, run with the official SGLang image `lmsysorg/sglang@sha256:b1259f3ea3275f66237c498ea388919729018bc9f01c3d638391e06e2cf3f469` | `0919fb684102ef115126612f3fbb84d1027e7317` | [MiniMax H3 Community License Agreement](https://huggingface.co/MiniMaxAI/MiniMax-H3/blob/0919fb684102ef115126612f3fbb84d1027e7317/LICENSE) (accepted by the owner) |
 
 All weights come from the publisher's or author's own account. Every large file is checked against its published
 SHA-256 checksum when it is downloaded (Wan's 30 files are listed in `tools/media/wan_files.json`, LTX's six in
-`LTX_FILES` in `tools/media/media_settings.py`). On the owner's Modal account, LTX's six files (74.5 GiB) are read
+`LTX_FILES` in `tools/media/media_settings.py`, MiniMax H3's 81 in `tools/media/h3_files.json`). On the owner's Modal account, LTX's six files (74.5 GiB) are read
 **read-only** from a verified cache volume of another of his projects (`morriton-ltx-2-5-model-cache`), so they are
 not downloaded twice; the code checks the cache's checksum record against the pins. On any other Modal account,
 `--prepare` downloads the same six files into this project's own volume `beta-sequence-ltx-weights` and checks
@@ -125,7 +162,8 @@ The default route picks, in this order, and says which and why at the start of e
    --prepare` first, with its size, time and cost.
 
 `--engine ltx` or `--engine wan` asks for one model by name; `--engine ltx` then never switches to Wan. Asking for
-Wan when it is not downloaded yet downloads it first, as before. `--dry-run` shows the choice for this account
+Wan when it is not downloaded yet downloads it first, as before. `--engine h3` (MiniMax H3) is only ever used
+when asked for; without its files the run stops and names `--prepare --engine h3`. `--dry-run` shows the choice for this account
 without spending anything (it only reads a few small records in the Modal account).
 
 For testing only: `MEDIA_IGNORE_LTX_CACHE=1` makes the tool act as if the owner's cache was not there, and
@@ -139,11 +177,14 @@ stranger's path on his own account without touching his cache.
 | `beta-sequence-art-weights` | picture and cut-out models | 31.4 GiB |
 | `beta-sequence-wan-weights` | Wan2.2 | 117.5 GiB |
 | `beta-sequence-ltx-weights` | LTX-2.5, only on accounts without the owner's cache | 74.5 GiB (the six pinned files) |
+| `beta-sequence-h3-weights` | MiniMax H3, only if prepared on an account without the owner's copy | 134.2 GiB (the 81 pinned files) |
+| `savia-spot-minimax-h3-42ed227e` | MiniMax H3 on the owner's account; belongs to another project, only read | 134.2 GiB (not ours, not counted below) |
 
 **Price** ([modal.com/pricing](https://modal.com/pricing), read 2026-11-11): stored files cost $0.09 per GiB per month,
 and the **first 1 TiB per month is free** for the whole Modal workspace. So these volumes cost **nothing** while the
 workspace stays under 1 TiB in total. Above that, the owner's two volumes would cost about **$13.40 a month**
-together; with LTX-2.5 as well (about 223 GiB in all) about **$20.10 a month**.
+together; with LTX-2.5 as well (about 223 GiB in all) about **$20.10 a month**; an own MiniMax H3 copy would add
+about $12.10 a month.
 
 **Between dancers nothing else costs money.** No machine keeps running: every cloud machine is started for one
 step and stopped right after it. The only standing cost is the storage above.
@@ -154,10 +195,11 @@ step and stopped right after it. The only standing cost is the storage above.
 modal volume delete beta-sequence-wan-weights      # Wan2.2
 modal volume delete beta-sequence-art-weights      # picture and cut-out models
 modal volume delete beta-sequence-ltx-weights      # LTX-2.5 (only if you prepared your own)
+modal volume delete beta-sequence-h3-weights       # MiniMax H3 (only if you prepared your own)
 ```
 
-Never delete `morriton-ltx-2-5-model-cache`: it belongs to another project. The drawback of deleting is the
-download next time:
+Never delete `morriton-ltx-2-5-model-cache` or `savia-spot-minimax-h3-42ed227e`: they belong to other projects.
+The drawback of deleting is the download next time:
 
 - Picture models: the next new dancer downloads them again by itself, about 5 minutes (282 s measured) and
   about $0.01, before drawing.
@@ -165,9 +207,10 @@ download next time:
   about $0.07. On the owner's account the default route does not need it (it uses LTX-2.5 from the cache).
 - LTX-2.5 (own copy): downloaded again by `--prepare`, about 80 GB, estimated 10 minutes and $0.05; it needs the
   Hugging Face sign-in. Until then the default route uses Wan2.2 if that is there.
+- MiniMax H3 (own copy): downloaded again by `--prepare --engine h3`, 144 GB, estimated 18 minutes and $0.20.
 
-**What a new dancer costs each time:** about $0.35 with LTX-2.5 (about 6 minutes) or about $0.80 with Wan2.2
-(about 10 minutes), pictures and cut-out included; about $0.28 with LTX-2.5 when only the dance is made from an
+**What a new dancer costs each time:** about $0.35 with LTX-2.5 (about 6 minutes), about $0.80 with Wan2.2
+(about 10 minutes) or about $0.78 with MiniMax H3 (about 12 minutes), pictures and cut-out included; about $0.28 with LTX-2.5 when only the dance is made from an
 existing picture (`--from-still`, measured). Run times and prices are in "Cost details" below.
 
 ## Setup (once)
@@ -226,8 +269,8 @@ python tools/media/generate.py --name "Tayne" `
 - `--prompt` describes the person and the dance in plain words: what they look like, then "Dance: ...".
 - `--expressions` can be repeated or comma-separated. Each one becomes `<name>.png`.
 - `--seed` makes a result repeatable. Without it, the seed comes from the name.
-- `--engine ltx` (default; see "Which dance model a run uses"), `wan` or `openrouter` (`seedance` also works).
-  With `openrouter`, `--model` picks any
+- `--engine ltx` (default; see "Which dance model a run uses"), `wan`, `h3` (MiniMax H3, see its section) or
+  `openrouter` (`seedance` also works). With `openrouter`, `--model` picks any
   model in OpenRouter's video catalogue that accepts a first and a last frame (default `bytedance/seedance-2.5`;
   `minimax/hailuo-3-max` is the other one checked) and `--resolution` picks its size (default `480p`, which is
   already 720 pixels tall after shaping).
@@ -283,6 +326,7 @@ of the resources requested:
 | Draw + cut out stills | L40S, 4 cores, 32 GiB | $0.000665 | 40 to 60 s, $0.03 to $0.04 |
 | Dance, LTX-2.5 | H200, 4 cores, 128 GiB | $0.001598 | 166 to 174 s, $0.27 to $0.28 |
 | Dance, Wan2.2 | H200, 4 cores, 128 GiB | $0.001598 | 448 to 460 s, $0.72 to $0.74 |
+| Dance, MiniMax H3 | H200, 8 cores, 128 GiB | $0.001650 | 436 s, $0.72 (one run; limit 700 s, $1.16) |
 | Cut out every frame | L40S, 4 cores, 32 GiB | $0.000665 | 46 to 60 s, $0.03 to $0.04 |
 | Downloads and checks | 2 to 4 cores, no graphics card | $0.00004 to $0.00009 | see "First time on your own Modal account" |
 | Stored model files | Modal volumes | $0.09 per GiB per month above the free 1 TiB | $0 for this project's 149 to 223 GiB |
@@ -373,6 +417,18 @@ checksum and made the volume ready, exactly as after a download. The temporary v
 The clip (Tayne's own picture, prompt and seed 9002, grey backdrop) was a clear strut with the hat staying on, a
 natural face and clean see-through edges, like the shipped one. It was not kept in the repository.
 
+### MiniMax H3 test loop (2026-11-11, cap $3): about $0.80
+
+Nothing was downloaded: the owner's existing H3 copy was only read. Nothing failed, so nothing was paid twice.
+
+| What | Steps | Cost |
+|---|---|---|
+| Looking inside the SGLang software (which code, which settings) | 3 small runs without a graphics card, 147 s in all | $0.005 |
+| `--prepare --engine h3` on the owner's copy | all 81 checksums, every byte read (188 s, 8 cores) | $0.026 |
+| One Tayne loop with `--engine h3` | dance on one H200 436 s ($0.719), cut-out 38 s ($0.025) | $0.744 |
+| Fetching the SGLang software image into Modal | | under $0.05 (estimate) |
+| **Total** | | **about $0.80** |
+
 ## Tests
 
 ```powershell
@@ -383,7 +439,9 @@ The tests need no cloud, no graphics card and no key. They check the `media.json
 (backdrop tint, green halos, blurred hands), the loop step, the hat line, a real ffmpeg round trip that proves the
 see-through background survives VP9 encoding, the choice of dance model per account (owner's cache, own copy,
 only Wan, nothing prepared, Hugging Face sign-in needed, the testing switch), the LTX download's checksum step on
-tiny stand-in files, and the OpenRouter route against a fake local server: request shape
+tiny stand-in files, MiniMax H3 (its pinned file list, owner's copy read-only, own copy, nothing there, never the
+default, the prompt layout, the checksum checks on stand-in files, the cost limit), and the OpenRouter route
+against a fake local server: request shape
 (same picture first and last, no audio), polling, download (the key is not sent to the storage server), refused
 and failed jobs (never re-sent), the time limit, the spending cap, and prices per token, per second and in cents.
 
@@ -399,6 +457,8 @@ and failed jobs (never re-sent), the time limit, the spending cap, and prices pe
 | `tools/media/media_art.py` | Runs in the cloud: drawing (Z-Image-Turbo) and cut-out (BiRefNet). |
 | `tools/media/media_ltx.py` | Runs in the cloud: the LTX-2.5 download and check, and the LTX-2.5 dance. |
 | `tools/media/media_wan.py`, `wan_files.json` | Runs in the cloud: the Wan2.2 dance, and its pinned file list. |
+| `tools/media/media_h3_cloud.py` | The separate Modal app for MiniMax H3 (only used with `--engine h3`). |
+| `tools/media/media_h3.py`, `h3_files.json` | Runs in the cloud: the MiniMax H3 checks, download and dance, and its pinned file list. |
 | `tools/media/media_hosted.py` | The OpenRouter route: catalogue check, price, one request, polling, download. |
 | `tools/media/media_finish.py` | Runs locally: cut-out clean-up, layout, loop, VP9 encode, hat line. |
 | `tools/media/media_contract.py` | Builds and checks `media.json` folders. |

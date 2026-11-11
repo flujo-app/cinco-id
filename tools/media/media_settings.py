@@ -79,6 +79,25 @@ WAN_REVISION = "596658fd9ca6b7b71d5057529bbf319ecbc61d74"
 WAN_LICENSE = "apache-2.0"
 WAN_WIDTH, WAN_HEIGHT = 544, 720               # 3:4, about Wan's 480p pixel count, divisible by 16
 
+# --- Motion model 3: MiniMax H3, first-and-last-frame checkpoint (optional, never the default) ---
+# MiniMax H3 Community License; the owner accepted it for this project. Exact file list with
+# checksums: h3_files.json next to this file (the FL2VA folder, 81 files, 144 GB).
+H3_REPO = "MiniMaxAI/MiniMax-H3"
+H3_REVISION = "0919fb684102ef115126612f3fbb84d1027e7317"
+H3_FOLDER = "FL2VA"
+H3_LICENSE = "minimax-h3-community-license-agreement"
+H3_LICENSE_URL = f"https://huggingface.co/{H3_REPO}/blob/{H3_REVISION}/LICENSE"
+H3_CODE = "SGLang 0.5.21 (official image, pinned by digest)"
+# The official SGLang server image, which runs H3 on one graphics card. Pinned by digest.
+SGLANG_IMAGE = "lmsysorg/sglang@sha256:b1259f3ea3275f66237c498ea388919729018bc9f01c3d638391e06e2cf3f469"
+# Another project's copy of exactly these FL2VA files (downloaded at revision 42ed227e, whose
+# FL2VA files are byte-identical to the pinned revision). Mounted READ-ONLY, never written.
+H3_CACHE_VOLUME = "savia-spot-minimax-h3-42ed227e"
+H3_CACHE_ROOT = "42ed227ee7df40d41602854ae760620d6eb651fe"
+# Ours, filled by `generate.py --prepare --engine h3` when no copy exists yet.
+H3_WEIGHTS_VOLUME = "beta-sequence-h3-weights"
+H3_SETTINGS = {"short_edge": 768, "aspect_ratio": "3:4", "duration_seconds": 4.0, "num_inference_steps": 50}
+
 # --- Software pins ------------------------------------------------------------
 TORCH_PACKAGES = ("torch==2.9.1", "torchvision==0.24.1", "torchaudio==2.9.1")
 TORCH_INDEX = "https://download.pytorch.org/whl/cu128"
@@ -138,6 +157,10 @@ PREPARE_TIMEOUT = 2400
 DOWNLOAD_CPU = 4                               # the big downloads (Wan2.2, LTX-2.5)
 DOWNLOAD_MEMORY_MIB = 16384
 DOWNLOAD_TIMEOUT = 3600
+H3_GPU = "H200"                                # 141 GB: the 110 GiB of weights stay on the card
+H3_CPU = 8
+H3_MEMORY_MIB = 131072
+H3_TIMEOUT = 700                               # measured 436 s; the limit also caps the cost
 
 # --- Published prices (https://modal.com/pricing, checked 2026-11-10) ---------
 PRICES_CHECKED = "2026-11-10"
@@ -157,6 +180,8 @@ MOTION_RATE = rate_per_second(MOTION_GPU, MOTION_CPU, MOTION_MEMORY_MIB)
 PREPARE_RATE = rate_per_second(None, PREPARE_CPU, PREPARE_MEMORY_MIB)
 WAN_PREPARE_RATE = rate_per_second(None, DOWNLOAD_CPU, DOWNLOAD_MEMORY_MIB)
 LTX_PREPARE_RATE = WAN_PREPARE_RATE
+H3_RATE = rate_per_second(H3_GPU, H3_CPU, H3_MEMORY_MIB)
+H3_CHECK_RATE = rate_per_second(None, 8, 16384)
 
 # One-time downloads: size in GB and seconds (download + checksum check).
 # Pictures and Wan were measured on 2026-11-11. LTX is an estimate scaled from the Wan download
@@ -166,14 +191,18 @@ PREPARE_GB = {
                   + sum(size for size, _ in BIREFNET_FILES.values())) / 1e9, 1),
     "ltx": round(sum(size for _, size, _ in LTX_FILES.values()) / 1e9, 1),
     "wan": 126.0,
+    "h3": 144.1,
 }
-PREPARE_SECONDS = {"art": 282, "ltx": 600, "wan": 754}
-PREPARE_RATES = {"art": PREPARE_RATE, "ltx": LTX_PREPARE_RATE, "wan": WAN_PREPARE_RATE}
+# H3: the download is estimated from the Wan download speed; the full checksum check of the
+# 144 GB was measured on the owner's copy (176 s).
+PREPARE_SECONDS = {"art": 282, "ltx": 600, "wan": 754, "h3": 1100}
+PREPARE_RATES = {"art": PREPARE_RATE, "ltx": LTX_PREPARE_RATE, "wan": WAN_PREPARE_RATE, "h3": H3_CHECK_RATE}
 SOFTWARE_BUILD_USD = 0.10      # building the cloud software the first time (estimate)
 
 # Dance engines that run on our own Modal account (no other account or key needed),
-# with typical seconds of H200 time per clip including start-up and model loading.
-MODAL_DANCE_SECONDS = {"ltx": 240, "wan": 460}
+# with typical seconds of graphics-card time per clip including start-up and model loading.
+MODAL_DANCE_SECONDS = {"ltx": 240, "wan": 460, "h3": 440}
+DANCE_RATES = {"ltx": MOTION_RATE, "wan": MOTION_RATE, "h3": H3_RATE}
 DEFAULT_ENGINE = "ltx"   # chosen after a side-by-side test; see docs/MEDIA.md
 
 # Upper bound used before starting: art 240 s, motion 420 s, cut-out 240 s.
@@ -191,6 +220,9 @@ def model_records(engine: str = "ltx") -> list[dict]:
                            "code": f"{LTX_CODE_REPOSITORY}@{LTX_CODE_REVISION}"})
     if engine == "wan":
         records.insert(1, {"repo": WAN_REPO, "revision": WAN_REVISION, "license": WAN_LICENSE, "role": "dance motion"})
+    if engine == "h3":
+        records.insert(1, {"repo": H3_REPO, "revision": H3_REVISION, "license": H3_LICENSE, "role": "dance motion",
+                           "partition": H3_FOLDER, "code": H3_CODE, "image": SGLANG_IMAGE})
     return records
 
 

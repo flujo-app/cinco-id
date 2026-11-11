@@ -43,7 +43,8 @@ def plan(engine: str, resolution: str, stills: bool, model_id: str = S.SEEDANCE_
         model = SD.find_model(SD.catalogue(SD.Http()), model_id)      # public price list, no key sent
         each = float(SD.plan_clip(model, resolution)["usd"]) + 90 * S.ART_RATE
     else:
-        each = S.MODAL_DANCE_SECONDS[engine or S.DEFAULT_ENGINE] * S.MOTION_RATE + 90 * S.ART_RATE
+        engine = engine or S.DEFAULT_ENGINE
+        each = S.MODAL_DANCE_SECONDS[engine] * S.DANCE_RATES[engine] + 90 * S.ART_RATE
     steps = []
     for entry in cast:
         folder = root / Path(entry["id"])
@@ -76,7 +77,7 @@ def command(entry: dict, folder: Path, engine: str, resolution: str, stills: boo
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--engine", choices=["wan", "ltx", "openrouter", "seedance"],
+    parser.add_argument("--engine", choices=["wan", "ltx", "h3", "openrouter", "seedance"],
                         help="dance model; by default the same choice as generate.py (LTX-2.5, or Wan2.2 if "
                              "LTX-2.5 is not ready on this Modal account)")
     parser.add_argument("--model", default=S.SEEDANCE_MODEL, help="OpenRouter catalogue id for --engine openrouter")

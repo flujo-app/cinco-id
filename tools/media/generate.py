@@ -2,7 +2,7 @@
 
     python tools/media/generate.py --name "Tayne" --prompt "<person and dance>" --out <folder>
                                    [--expressions smiling] [--seed N]
-                                   [--engine wan|ltx|openrouter] [--model <catalogue id>]
+                                   [--engine wan|ltx|h3|openrouter] [--model <catalogue id>]
                                    [--resolution 480p|720p|768p] [--dry-run]
                                    [--stills-only | --from-still] [--max-cost 1.5]
     python tools/media/generate.py --prepare      # one-time download and checks, no graphics card
@@ -17,6 +17,8 @@ Engines for the dance step:
   ltx         LTX-2.5 (open model) on our own Modal cloud graphics card. The default: it uses the
               owner's existing copy if this Modal account has it, else the copy --prepare
               downloads. If neither is ready but Wan2.2 is, the default run uses Wan2.2 and says so.
+  h3          MiniMax H3 (open model, first-and-last-frame part) on one Modal H200, only when asked
+              for. Needs its 144 GB of files once: `--prepare --engine h3` checks or downloads them.
   openrouter  A hosted model through OpenRouter (default model Seedance 2.5; any catalogue model
               that takes a first and last frame, e.g. minimax/hailuo-3-max). Paid per clip with the
               owner's key, read only from the OPENROUTER_API_KEY environment variable.
@@ -178,6 +180,46 @@ def cloud():
         import media_cloud as C
         with C.app.run():
             yield C
+
+
+def h3_state() -> dict:
+    """Is a MiniMax H3 copy on this Modal account? (free look-ups; only asked when H3 is wanted)"""
+    with contextlib.redirect_stdout(sys.stderr):
+        return R.inspect_h3()
+
+
+def configure_h3_cloud(state: dict) -> None:
+    """Tell the H3 cloud module which storage holds the files. Must happen before it is imported."""
+    settings = R.h3_cloud_settings(state)
+    loaded = sys.modules.get("media_h3_cloud")
+    if loaded is not None and loaded.H3_VOLUME_NAME != settings[R.CLOUD_H3_VOLUME]:
+        raise Failure("The cloud tools were already set up for another storage; please run the command again.")
+    os.environ.update(settings)
+
+
+@contextlib.contextmanager
+def h3_cloud():
+    """The separate, ephemeral Modal app for MiniMax H3; it exists only inside this block."""
+    with contextlib.redirect_stdout(sys.stderr):
+        import media_h3_cloud as H
+        with H.app.run():
+            yield H
+
+
+def h3_prompt(description: str, key_color_name: str, seconds: float) -> str:
+    """The dance request in the layout MiniMax's own prompt guide asks for (first and last frame)."""
+    return (f"How the reference pictures align with the target video — Picture 1 (from Shot 1) aligns with the "
+            f"0.00-second mark of the target video; Picture 2 (from Shot 1) aligns with the {seconds:.2f}-second "
+            f"mark of the target video.\n\n"
+            f"integrated_multimodal_description: [Shot 1] Live-action, early-1990s public-access TV video look, "
+            f"a static locked-off full-body shot with no zoom, no pan and no cuts. {description}. The person "
+            f"begins in the pose and framing established by Picture 1, dances on the spot in the middle of the "
+            f"frame with smooth, rhythmic, slightly goofy moves, keeps the whole body in view from head to feet "
+            f"the entire time, and settles back into exactly the pose, spacing and composition established by "
+            f"Picture 2 at the end of the shot. The background is a plain flat {key_color_name} studio backdrop "
+            f"that stays perfectly even and still. No other people, no text, no talking.\n\n"
+            f"overall_soundscape: Quiet studio room tone with soft footsteps and the rustle of clothing.\n\n"
+            f"non_diegetic_music: An upbeat, slightly cheesy synth-pop beat at a moderate tempo.")
 
 
 # --- pictures -------------------------------------------------------------------------
@@ -366,7 +408,10 @@ def dry_run(args, engine: str, expressions: list[str], seed: int) -> dict:
     if engine in S.MODAL_DANCE_SECONDS:
         result = {"dryRun": True, "engine": engine, "keyPresent": bool(SD.read_key())}
         try:
-            route = R.choose_route(args.engine and engine, account_state())
+            state = account_state()
+            if engine == "h3":
+                state.update(h3_state())
+            route = R.choose_route(args.engine and engine, state)
         except Exception as error:  # noqa: BLE001 - the dry run still prices the request
             result.update(accountChecked=False,
                           why=f"Could not look at the Modal account, so the dance model is not confirmed: "
@@ -378,7 +423,7 @@ def dry_run(args, engine: str, expressions: list[str], seed: int) -> dict:
                 result["whatToDo"] = route["whatToDo"]
             engine = route["engine"] or engine
         result.update(
-            costUsdEstimate=round(drawing_usd + S.MODAL_DANCE_SECONDS[engine] * S.MOTION_RATE + cutout_usd, 2),
+            costUsdEstimate=round(drawing_usd + S.MODAL_DANCE_SECONDS[engine] * S.DANCE_RATES[engine] + cutout_usd, 2),
             note="Runs on our own Modal graphics card; estimate from measured run times. No key needed. "
                  "Only free look-ups in the Modal account were made.")
         return result
@@ -439,6 +484,8 @@ def generate(args: argparse.Namespace) -> dict:
             if spent + dance_usd > args.hosted_cap:
                 raise Failure(f"OpenRouter spending would pass the ${args.hosted_cap:.2f} cap "
                               f"(already ${spent:.2f} plus about ${dance_usd:.2f}); nothing was sent")
+        elif engine == "h3":
+            dance_usd = S.H3_TIMEOUT * S.H3_RATE        # the machine's own time limit bounds it
         else:
             dance_usd = 1.5 * S.MODAL_DANCE_SECONDS[engine] * S.MOTION_RATE
     worst = (0 if args.from_still else 240 * S.ART_RATE) + dance_usd + (0 if args.stills_only else 240 * S.ART_RATE)
@@ -447,6 +494,8 @@ def generate(args: argparse.Namespace) -> dict:
 
     # Which dance model this Modal account can run (free look-ups, nothing is started).
     state = account_state()
+    if engine == "h3" and not args.stills_only:
+        state.update(h3_state())
     if not args.stills_only and engine != "openrouter":
         route = R.choose_route(args.engine and engine, state)
         if route["engine"] is None:
@@ -495,11 +544,23 @@ def generate(args: argparse.Namespace) -> dict:
                                                                                      S.KEYFRAME_HEIGHT)
     elif engine == "wan":
         width, height = S.WAN_WIDTH, S.WAN_HEIGHT
-    else:
+    else:                                              # LTX-2.5 and MiniMax H3 (3:4 at a 768-pixel short edge)
         width, height = S.MOTION_WIDTH, S.MOTION_HEIGHT
     key_name, key_color, picture = keyframe_on_backdrop(keyframe, (width, height), args.backdrop)
     prompts["motion"] = motion_prompt(args.prompt.strip().rstrip("."), key_name)
-    if engine == "openrouter":
+    if engine == "h3":
+        prompts["motion"] = h3_prompt(args.prompt.strip().rstrip("."), key_name, S.H3_SETTINGS["duration_seconds"])
+        h3_request = {"keyframe": picture, "prompt": prompts["motion"], "seed": seed, "settings": S.H3_SETTINGS,
+                      "load_timeout": 360, "generate_timeout": 300}
+        configure_h3_cloud(state)
+        progress("motion", 0.3, "Teaching the character to dance with MiniMax H3 (the slow part, about 8 minutes)")
+        with h3_cloud() as H:
+            moved = remote_step(work, "dance-h3", h3_request, lambda: run_remote(
+                H.animate_h3, h3_request, S.H3_RATE, ledger, "dance (h3)"))
+        models = S.model_records("h3")
+        extra = {"engine": "h3", "h3": {"timings": moved.get("timings"), "gpu": moved.get("gpu"),
+                                        "stream": moved.get("stream"), "settings": S.H3_SETTINGS}}
+    elif engine == "openrouter":
         progress("motion", 0.3, "Sending the picture to the video service (usually 1 to 4 minutes)")
         request = SD.build_request(prompts["motion"], picture, plan, seed)
 
@@ -605,6 +666,31 @@ def prepare(dry: bool = False) -> dict:
     return result
 
 
+def prepare_h3(dry: bool = False) -> dict:
+    """`--prepare --engine h3`: check the owner's copy, or download our own. Only for MiniMax H3."""
+    ledger = {"usd": 0.0, "steps": []}
+    state = h3_state()
+    plan = R.h3_prepare_plan(state)
+    if dry:
+        return {"dryRun": True, "prepare": plan, "danceModel": "MiniMax H3",
+                "note": "Nothing was downloaded or started; only free look-ups in the Modal account were made."}
+    if R.h3_where(state) == "own":
+        return {"done": True, "danceModel": "MiniMax H3", "message": "MiniMax H3 is already ready.",
+                "costUsdEstimate": 0.0}
+    progress("setup", 0.05, f"Getting MiniMax H3 ready: {plan['summary']}. Finished parts are kept.")
+    configure_h3_cloud(state)
+    with h3_cloud() as H:
+        report = run_remote(H.prepare_h3_weights, None, S.H3_CHECK_RATE, ledger,
+                            "check MiniMax H3 files" if R.h3_where(state) == "cache" else "get MiniMax H3 files")
+    append_ledger({"time": datetime.now(timezone.utc).isoformat(), "name": "prepare h3",
+                   "usd": round(ledger["usd"], 4), "steps": ledger["steps"]})
+    if report.get("bad"):
+        raise Failure(f"{len(report['bad'])} of the MiniMax H3 files do not match their published checksums, so "
+                      f"that copy is not used. Nothing was changed in it.")
+    return {"done": True, "danceModel": "MiniMax H3", "report": report,
+            "message": "MiniMax H3 is ready. Use it with --engine h3.", "costUsdEstimate": round(ledger["usd"], 2)}
+
+
 def _ltx_step(plan: dict) -> dict:
     return next(step for step in plan["downloads"] if step["model"].startswith("LTX"))
 
@@ -616,7 +702,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out")
     parser.add_argument("--expressions", action="append", help="for example: smiling (repeat or comma-separate)")
     parser.add_argument("--seed", type=int)
-    parser.add_argument("--engine", choices=["wan", "ltx", "openrouter", "seedance"],
+    parser.add_argument("--engine", choices=["wan", "ltx", "h3", "openrouter", "seedance"],
                         help=f"dance step; default {S.DEFAULT_ENGINE} (our own Modal route; Wan2.2 if LTX-2.5 is not "
                              "ready on this account). openrouter needs OPENROUTER_API_KEY")
     parser.add_argument("--model", default=S.SEEDANCE_MODEL,
@@ -648,7 +734,7 @@ def main(argv: list[str] | None = None) -> int:
     os.environ.setdefault("PYTHONUTF8", "1")
     try:
         if args.prepare:
-            emit(**prepare(dry=args.dry_run))
+            emit(**(prepare_h3(dry=args.dry_run) if args.engine == "h3" else prepare(dry=args.dry_run)))
             return 0
         if args.stills_only and args.from_still:
             raise Failure("Choose either --stills-only or --from-still, not both.")
@@ -667,6 +753,7 @@ def main(argv: list[str] | None = None) -> int:
         emit(error="Stopped before it was finished.")
         return 130
     except BaseException as error:  # noqa: BLE001 - every failure must become one plain JSON line
+        print(f"{type(error).__name__}: {error}"[:6000], file=sys.stderr)   # full detail for whoever looks
         emit(error=friendly(error))
         return 1
 

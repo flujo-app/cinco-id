@@ -26,7 +26,12 @@ CLOUD_LTX_READ_ONLY = "MEDIA_CLOUD_LTX_READ_ONLY"
 CLOUD_HF_SECRET = "MEDIA_CLOUD_HF_SECRET"
 NO_SECRET = "none"
 
-NAMES = {"ltx": "LTX-2.5", "wan": "Wan2.2", "openrouter": "a hosted OpenRouter model"}
+NAMES = {"ltx": "LTX-2.5", "wan": "Wan2.2", "h3": "MiniMax H3", "openrouter": "a hosted OpenRouter model"}
+H3_PREPARE_COMMAND = "python tools/media/generate.py --prepare --engine h3"
+CLOUD_H3_VOLUME = "MEDIA_CLOUD_H3_VOLUME"
+CLOUD_H3_READ_ONLY = "MEDIA_CLOUD_H3_READ_ONLY"
+CLOUD_H3_ROOT = "MEDIA_CLOUD_H3_ROOT"
+H3_SPEC_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "h3_files.json")
 
 
 # --- records -----------------------------------------------------------------------------
@@ -68,6 +73,18 @@ class ModalAccount:
             return json.loads(data.decode("utf-8-sig"))
         except ValueError:
             return None
+
+    def file_sizes(self, volume: str, folder: str) -> dict | None:
+        """Every file below `folder` with its size, or None if the volume or folder is not there."""
+        import modal
+        from modal.exception import NotFoundError
+        try:
+            entries = modal.Volume.from_name(volume).listdir(folder, recursive=True)
+        except (NotFoundError, FileNotFoundError):
+            return None
+        prefix = folder.strip("/") + "/"
+        return {entry.path[len(prefix):] if entry.path.startswith(prefix) else entry.path: entry.size
+                for entry in entries if getattr(entry.type, "name", str(entry.type)) == "FILE"}
 
     def secret_exists(self, name: str) -> bool:
         import modal
@@ -165,6 +182,8 @@ def ltx_missing_reason(state: dict) -> str:
 
 def choose_route(requested: str | None, state: dict) -> dict:
     """Pick the dance model for one run. `requested` is None for the default route."""
+    if requested == "h3":
+        return choose_h3_route(state)
     where = ltx_where(state)
     ltx_from = {"cache": "the owner's existing copy (read-only)", "own": "this account's own copy"}.get(where)
     route = {"engine": None, "why": "", "whatToDo": None, "fallback": False, "ltxFrom": ltx_from}
@@ -231,3 +250,72 @@ def prepare_plan(state: dict) -> dict:
         summary = "everything is already downloaded; it only checks the tools, under $0.05"
     return {"downloads": steps, "alreadyReady": ready, "downloadGb": gb, "minutes": minutes,
             "usdEstimate": usd, "summary": summary, "ltxSignIn": ltx_note}
+
+
+# --- MiniMax H3 (optional, never the default) ------------------------------------------------------
+def h3_spec() -> dict:
+    with open(H3_SPEC_PATH, encoding="utf-8") as stream:
+        return json.load(stream)
+
+
+def h3_sizes_ok(sizes: dict | None) -> bool:
+    """True if a folder listing holds every pinned FL2VA file at its pinned size."""
+    if not sizes:
+        return False
+    return all(sizes.get(name) == size for name, (size, _digest) in h3_spec()["files"].items())
+
+
+def h3_record_ok(record: dict | None) -> bool:
+    return isinstance(record, dict) and record.get("status") == "ready" and \
+        (record.get("repo"), record.get("revision"), record.get("folder")) == (S.H3_REPO, S.H3_REVISION, S.H3_FOLDER)
+
+
+def inspect_h3(account=None) -> dict:
+    """Is there a usable MiniMax H3 copy? Free look-ups only; asked only when H3 is wanted."""
+    account = account or ModalAccount()
+    owner = h3_sizes_ok(account.file_sizes(S.H3_CACHE_VOLUME, f"{S.H3_CACHE_ROOT}/{S.H3_FOLDER}"))
+    own = h3_record_ok(account.read_json(S.H3_WEIGHTS_VOLUME, "ready.json"))
+    return {"h3OwnerCopy": owner, "h3Own": own}
+
+
+def h3_where(state: dict) -> str | None:
+    if state.get("h3OwnerCopy"):
+        return "cache"
+    if state.get("h3Own"):
+        return "own"
+    return None
+
+
+def h3_cloud_settings(state: dict) -> dict:
+    if h3_where(state) == "cache":
+        return {CLOUD_H3_VOLUME: S.H3_CACHE_VOLUME, CLOUD_H3_READ_ONLY: "1", CLOUD_H3_ROOT: S.H3_CACHE_ROOT}
+    return {CLOUD_H3_VOLUME: S.H3_WEIGHTS_VOLUME, CLOUD_H3_READ_ONLY: "0", CLOUD_H3_ROOT: S.H3_REVISION}
+
+
+def h3_prepare_plan(state: dict) -> dict:
+    where = h3_where(state)
+    if where == "cache":
+        usd = round(300 * S.H3_CHECK_RATE + 0.01, 2)
+        return {"download": False, "gb": 0, "minutes": 5, "usdEstimate": usd,
+                "summary": f"nothing to download: the owner's existing copy is used read-only; every checksum "
+                           f"is checked, about 5 minutes, about ${usd:.2f}"}
+    if where == "own":
+        return {"download": False, "gb": 0, "minutes": 0, "usdEstimate": 0.0, "summary": "MiniMax H3 is ready"}
+    seconds = S.PREPARE_SECONDS["h3"]
+    usd = round(seconds * S.PREPARE_RATES["h3"] + 0.05, 2)
+    return {"download": True, "gb": S.PREPARE_GB["h3"], "minutes": round(seconds / 60), "usdEstimate": usd,
+            "summary": f"about {S.PREPARE_GB['h3']:.0f} GB to download into your own Modal storage, about "
+                       f"{round(seconds / 60)} minutes, about ${usd:.2f} of cloud time"}
+
+
+def choose_h3_route(state: dict) -> dict:
+    where = h3_where(state)
+    route = {"engine": None, "why": "", "whatToDo": None, "fallback": False, "ltxFrom": None}
+    if where:
+        source = {"cache": "the owner's existing copy (read-only)", "own": "this account's own copy"}[where]
+        route.update(engine="h3", why=f"You asked for MiniMax H3: it uses {source}.")
+    else:
+        plan = h3_prepare_plan(state)
+        route.update(why="MiniMax H3 is not ready on this Modal account.",
+                     whatToDo=f"Run {H3_PREPARE_COMMAND} once first ({plan['summary']}).")
+    return route
