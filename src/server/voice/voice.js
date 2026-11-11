@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
-import { promises as fs } from 'node:fs';
+import { promises as fs, existsSync } from 'node:fs';
 import os from 'node:os';
+import { bestMatch } from '../text.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { LineWorker } from './worker.js';
@@ -30,17 +31,64 @@ function toSpeechWav(ffmpeg, from, to) {
   });
 }
 
-/** The computer's voice. Sentences are kept on disk, so each one is only made once. */
+function windowsWorker() {
+  return new LineWorker({
+    name: 'The Windows voice',
+    command: 'powershell.exe',
+    args: ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', path.join(here, 'tts_windows.ps1')],
+    startTimeoutMs: 30_000,
+  });
+}
+
+/**
+ * The computer's voice. Sentences are kept on disk, so each one is only made once.
+ * Engines: "voder" (the robot voice), "windows" (any voice installed in Windows, chosen by
+ * name in `voice`), "browser" (the screen speaks with whatever the browser offers).
+ */
 export class Speaker {
   constructor(config, cacheDir) {
     this.config = config;
     this.cacheDir = cacheDir;
     this.engine = config.engine;
+    this.voice = config.voice ?? null; // name of the Windows voice, when that engine is used
     this.worker = null;
     this.inFlight = new Map();
   }
 
-  get serverSide() { return this.engine === 'voder'; }
+  get serverSide() { return this.engine === 'voder' || this.engine === 'windows'; }
+
+  get voderAvailable() { return existsSync(path.join(this.config.voderPath ?? '', 'voder', 'engine.py')); }
+
+  /** Every voice that can be used on this PC: the robot voice plus what Windows has installed. */
+  async list() {
+    const voices = [];
+    if (this.voderAvailable) voices.push({ engine: 'voder', name: 'Robot', labels: ['robot', 'voder', 'robot voice', 'the robot', 'default'] });
+    if (process.platform === 'win32') {
+      const lister = this.engine === 'windows' && this.worker ? this.worker : windowsWorker();
+      try {
+        const reply = await lister.request({ list: true }, 20_000);
+        for (const voice of reply.voices ?? []) {
+          const short = voice.name.replace(/^Microsoft\s+/i, '').replace(/\s+Desktop$/i, '');
+          voices.push({ engine: 'windows', name: voice.name, language: voice.language, labels: [voice.name, short, `${short} voice`] });
+        }
+      } catch { /* no Windows voices to offer */ } finally {
+        if (lister !== this.worker) lister.stop();
+      }
+    }
+    return voices;
+  }
+
+  /** Switches to a voice by what a person called it. Returns the chosen voice or null. */
+  async use(wanted) {
+    const choice = typeof wanted === 'string'
+      ? bestMatch(wanted, (await this.list()).map(voice => ({ key: voice.name, voice, labels: voice.labels })), { maxRatio: 0.25 })?.voice
+      : wanted;
+    if (!choice) return null;
+    if (choice.engine !== this.engine) { this.worker?.stop(); this.worker = null; }
+    this.engine = choice.engine;
+    this.voice = choice.engine === 'windows' ? choice.name : null;
+    return { engine: this.engine, name: choice.name };
+  }
 
   /** Starts the voice and prepares the everyday sentences, so the first answer is not late. */
   warm(sentences = []) {
@@ -52,24 +100,32 @@ export class Speaker {
     if (!this.serverSide) return null;
     const clean = String(text).replace(/\s+/g, ' ').trim().slice(0, 600);
     if (!clean) return null;
-    const settings = [this.config.pitch, this.config.rate, this.config.expression, this.config.mode];
+    const windows = this.engine === 'windows';
+    const settings = windows
+      ? ['windows', this.voice, this.config.windowsRate ?? 0]
+      : [this.config.pitch, this.config.rate, this.config.expression, this.config.mode];
     const name = createHash('sha256').update(JSON.stringify([clean, settings])).digest('hex').slice(0, 24);
     const file = path.join(this.cacheDir, `${name}.wav`);
     try { await fs.access(file); return file; } catch { /* not made yet */ }
     if (this.inFlight.has(file)) return this.inFlight.get(file);
     const job = (async () => {
       await fs.mkdir(this.cacheDir, { recursive: true });
-      this.worker ??= new LineWorker({
-        name: 'The voice',
-        command: this.config.python,
-        args: [path.join(here, 'tts_worker.py'), this.config.voderPath],
-      });
       const partial = `${file}.part`;
-      await this.worker.request({
-        text: clean, out: partial, pitch: this.config.pitch, rate: this.config.rate,
-        expression: this.config.expression, mode: this.config.mode,
-        lexicon: { ...BASE_LEXICON, ...(this.config.lexicon ?? {}) },
-      }, 30_000);
+      if (windows) {
+        this.worker ??= windowsWorker();
+        await this.worker.request({ text: clean, out: partial, voice: this.voice, rate: this.config.windowsRate ?? 0 }, 30_000);
+      } else {
+        this.worker ??= new LineWorker({
+          name: 'The voice',
+          command: this.config.python,
+          args: [path.join(here, 'tts_worker.py'), this.config.voderPath],
+        });
+        await this.worker.request({
+          text: clean, out: partial, pitch: this.config.pitch, rate: this.config.rate,
+          expression: this.config.expression, mode: this.config.mode,
+          lexicon: { ...BASE_LEXICON, ...(this.config.lexicon ?? {}) },
+        }, 30_000);
+      }
       await fs.rename(partial, file);
       return file;
     })().finally(() => this.inFlight.delete(file));

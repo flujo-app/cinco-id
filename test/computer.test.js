@@ -192,6 +192,35 @@ test('incoming calls show who is calling and can be declined', async () => {
   assert.equal(lastSaid(), 'Call declined.');
 });
 
+test('the voice can be listed and switched by name, and a missing voice is reported plainly', async () => {
+  const installed = [
+    { engine: 'voder', name: 'Robot', labels: ['robot', 'voder'] },
+    { engine: 'windows', name: 'Microsoft Zira Desktop', language: 'en-US', labels: ['Microsoft Zira Desktop', 'Zira'] },
+  ];
+  const used = [];
+  const voices = {
+    list: async () => installed,
+    use: async wanted => {
+      const found = installed.find(voice => voice.labels.some(label => label.toLowerCase() === String(wanted).toLowerCase()));
+      if (found) used.push(found.name);
+      return found ? { engine: found.engine, name: found.name } : null;
+    },
+  };
+  const { computer, lastSaid } = await boot({ extra: { voices } });
+
+  await computer.hear('Computer, what voices do you have?');
+  assert.equal(lastSaid(), '2 voices.');
+  assert.match([...computer.windows.values()].find(window => window.kind === 'note').text, /Microsoft Zira Desktop\s+\(en-US\)/);
+
+  await computer.hear('use the Zira voice');
+  assert.equal(lastSaid(), 'This is my voice now, Paul.');
+  await computer.hear('Can you talk like Microsoft Sam?');
+  assert.equal(lastSaid(), 'There is no voice called Microsoft Sam on this computer.');
+  await computer.hear('change your voice to robot');
+  assert.deepEqual(used, ['Microsoft Zira Desktop', 'Robot']);
+  assert.deepEqual(computer.voiceChoice, { engine: 'voder', name: 'Robot' });
+});
+
 test('new projects get a hex name and what was revealed is remembered', async () => {
   const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'beta-sequence-'));
   try {

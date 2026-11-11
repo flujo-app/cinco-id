@@ -42,6 +42,7 @@ In the window you can also hold the space bar to talk, or type into the "Compute
 | "Rainbow on Oyster", "tumble", "trails", "conga" ... | more effects; "normal" removes them |
 | "Close Oyster", "clear the desktop" | tidies up |
 | "Music off", "quiet" | stops the lounge music or the voice |
+| "What voices do you have?", "use the Zira voice", "talk like the robot" | lists and switches the computer's voice |
 | "Test call from my wife" | shows what an incoming call looks like |
 | "New project", "kick up the beef" | makes a new, empty project with a hex name |
 | anything else | goes to the brain, if one is connected |

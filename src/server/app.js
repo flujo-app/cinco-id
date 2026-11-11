@@ -94,6 +94,7 @@ export async function createApp({ rootDir, overrides = {}, env = process.env, pa
   let port = config.port;
   // Two keys to the /mcp door: one for the computer's own brain (new on every start), and one
   // for outside agents you connect yourself (kept in the state folder so it stays the same).
+  const speaker = parts.speaker ?? new Speaker(config.voice.tts, path.join(rootDir, '.cache', 'tts'));
   const brainToken = randomBytes(24).toString('hex');
   const guestToken = config.mcp?.token ?? await keptToken(path.join(config.stateDir, 'mcp-token'));
   const computer = new Computer({
@@ -107,9 +108,9 @@ export async function createApp({ rootDir, overrides = {}, env = process.env, pa
     }),
     generator: parts.generator !== undefined ? parts.generator : Generator.create(config.media),
     connectors,
+    voices: speaker,
   });
   await computer.restore();
-  const speaker = parts.speaker ?? new Speaker(config.voice.tts, path.join(rootDir, '.cache', 'tts'));
   const listener = parts.listener ?? new Listener(config.voice.stt);
 
   const sockets = new Set();
