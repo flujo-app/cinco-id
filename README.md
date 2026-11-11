@@ -38,7 +38,7 @@ made from one sentence, and an incoming call.
 
 ## Install
 
-Download `CINCO-ID-Setup-2.5.0.exe` from the [releases page](https://github.com/flujo-app/cinco-id/releases) and run
+Download `CINCO-ID-Setup-2.5.1.exe` from the [releases page](https://github.com/flujo-app/cinco-id/releases) and run
 it. It installs for your Windows user only and does not need administrator rights. You get a Start menu entry and a
 desktop shortcut; "CINCO ID" in Windows' "Apps" list removes it again (your settings and projects stay in your app
 data folder).
@@ -93,6 +93,7 @@ In the window you can also hold the space bar to talk, or type into the "Compute
 | "New project", "kick up the beef" | makes a new, empty project with a hex name |
 | "Generate a new sequence of a grandmother in a gold tracksuit doing disco moves" | makes a brand-new dancer in the background |
 | "Setup" | opens the Setup window |
+| "Link WhatsApp" | opens the Setup window on its WhatsApp page |
 | anything else | goes to the brain, if one is connected |
 
 "List everything" shows all projects, sequences, effects and learned words.
@@ -122,16 +123,21 @@ everything also works offline.
 ## Linking your accounts
 
 None of these is needed for the demo. The Setup window (it opens on the first start, or say "setup") walks you
-through all but WhatsApp.
+through all of them.
 
 | For | What you link | How |
 |---|---|---|
 | The brain | **Claude** | Install [Claude Code](https://claude.com/claude-code) and sign in once, so the `claude` command works. In Setup, choose "The Claude sign-in on this PC". No key is needed. Or choose "A service with a key" for OpenAI, OpenRouter or another chat service. |
 | New dancers | **Modal** | Make a [Modal](https://modal.com) account. In Setup, press "Sign in to Modal" (it opens your browser), then "Prepare...", which first shows what it will download and what that costs. For the better dance model you also accept its licence on Hugging Face and store a token in Modal; Setup shows the exact steps. |
 | Hosted dance models (optional) | **OpenRouter** | Paste an OpenRouter key into Setup. It is kept encrypted with your Windows sign-in. Then Seedance or MiniMax can be used for the dance step. |
-| Incoming calls | **WhatsApp** | Run [mcp-whatsapp-web](https://github.com/mario-andreschak/mcp-whatsapp-web) (1.4.2 or newer) and scan its QR code once with your phone. Then run `npm run whatsapp:link` here: it makes a private secret and prints three settings to give to that connector. To use the Decline button, also list the connector under `mcpServers` in the settings file and set `events.whatsapp.declineTool` to `"<its name>/reject_call"`. This is not in the Setup window yet. |
+| Incoming calls | **WhatsApp** | In Setup, go to the WhatsApp page (or say "link whatsapp"), press **Link WhatsApp** and scan the QR code with your phone: in WhatsApp, Settings, Linked devices, Link a device. CINCO ID becomes one more linked device on your WhatsApp, and the page switches to "Linked" by itself. Typing your phone number to get a code works too. This needs [Node.js](https://nodejs.org) 22 or newer on the PC. The first time, **Install** on the same page fetches the WhatsApp connector, [mcp-whatsapp-web](https://github.com/mario-andreschak/mcp-whatsapp-web) 1.4.2, which also needs [Git](https://git-scm.com). |
 
 Details for the dancer tools are in [docs/MEDIA.md](docs/MEDIA.md).
+
+**WhatsApp, the manual way.** If another program already runs mcp-whatsapp-web (1.4.2 or newer) for you, CINCO ID can
+use that one instead. Run `npm run whatsapp:link` here: it makes a private secret and prints three settings to give to
+that connector. To use the Decline button, also list the connector under `mcpServers` in the settings file and set
+`events.whatsapp.declineTool` to `"<its name>/reject_call"`. Both ways can be used at the same time.
 
 ## What it costs
 
@@ -191,6 +197,12 @@ Open it again any time from the Start menu ("Setup..."), or by saying or typing 
 
 The Start menu on the screen has "Projects folder" and "Printouts folder" to open them.
 
+WhatsApp keeps its own things in a `whatsapp` folder inside the data folder: the sign-in (`whatsapp\session`), the
+WhatsApp connector's log (`whatsapp\logs`) and the copy of the connector that Install fetched (`whatsapp\connector`).
+This sign-in belongs to CINCO ID alone, so it never gets in the way of another program that runs the same connector.
+The private secret for call alerts is kept encrypted with the other keys and is never shown. To remove all of it,
+press Unlink in Setup, then delete the `whatsapp` folder.
+
 ## Settings
 
 The Setup window writes `harness.config.json` in the data folder. You can also copy `harness.config.example.json`
@@ -216,10 +228,22 @@ there and change it by hand. That file stays on your PC and is not put into git.
 
 When someone calls you on WhatsApp, a window pops up with their saved name, WhatsApp name and number, the phone
 rings, and the computer says who is calling. A missed call leaves a note. Decline hangs up for you. The computer
-cannot pick up a call; ask it to and it tells you so, and the call keeps ringing.
+cannot pick up a call; ask it to and it tells you so, and the call keeps ringing. "Test call window" on the WhatsApp
+page in Setup shows what a call looks like.
+
+Linking is described under "Linking your accounts" above. While CINCO ID runs, it keeps the WhatsApp connector
+running in the background. The console window says when WhatsApp is linked, when the connection has dropped for a
+while, and when it is back. If the connector stops, it is started again after a short pause. When CINCO ID quits, the
+connector is stopped too. Unlink in Setup asks first, then removes CINCO ID from your linked devices.
+
+**Which one declines a call.** If you use both the Setup link and the manual way, Decline goes through the WhatsApp
+connection that reported the call. If that one is not answering right now, the other one is used. The Decline
+button is greyed out only while neither of them can do it.
 
 Only the caller's details are shown. Message text from outside is never handed to the brain, so nobody can give the
-computer orders by writing to you. Linking is described under "Linking your accounts" above.
+computer orders by writing to you. Through the Setup link, the brain may look up your contacts (search them, or look
+one up), without asking. It cannot send messages. To allow more, list the connector's tool names under
+`whatsapp.brainTools` in the settings file; anything beyond the two contact look-ups asks "Shall I?" every time.
 
 ## Letting other AI agents use the screen
 
@@ -246,6 +270,7 @@ npm test                                   # fast checks of the logic, the local
 npm run test:ui                            # starts the real app silently and plays the whole routine
 node test/ui/setup-check.mjs               # goes through the Setup window like a first start (no money, no browser)
 node test/ui/sturdy-check.mjs              # busy port, second start, quitting while a dancer is made, a broken settings file
+node test/ui/whatsapp-check.mjs            # links WhatsApp with a stand-in connector: Install, QR code, a call, Decline, Unlink
 node test/ui/overlay-check.mjs             # checks the see-through mode on the real desktop (Windows)
 node test/ui/print-check.mjs               # checks that a printout reaches the Windows print system
 node test/ui/clip-check.mjs "Celery Head"  # checks that a generated clip plays see-through

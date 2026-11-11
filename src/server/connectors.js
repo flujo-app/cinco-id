@@ -1,4 +1,5 @@
 import { EventEmitter } from 'node:events';
+import readline from 'node:readline';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
@@ -15,10 +16,17 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
  * restart). A server that cannot be reached is tried again quietly in the background, and a call
  * that fails because the connection dropped reconnects once and tries again. "change" is emitted
  * whenever a server comes or goes, so the screen can follow (for example the Decline button).
+ *
+ * The app can also add servers of its own while it runs (its own WhatsApp connector, see
+ * whatsapp.js). Those may say which of their tools the brain may see (`brainTools`), get exactly
+ * the environment they are given (`exactEnv`), and keep the last lines their program printed
+ * (`stderr: "pipe"`), so a problem can be explained.
  */
 
 // Waits between attempts to reach a server that is not there: soon at first, then every two minutes.
 const RETRY_MS = [5_000, 15_000, 30_000, 60_000, 120_000];
+// A server that stayed connected this long starts again from the shortest wait when it drops.
+const STEADY_MS = 60_000;
 
 /** Errors that mean the connection was the problem, not the tool or what was asked of it. */
 export function isConnectionProblem(error) {
@@ -27,19 +35,24 @@ export function isConnectionProblem(error) {
 }
 
 export class Connectors extends EventEmitter {
-  constructor(servers = {}, { declineTool = null, onProblem = () => {}, retryMs = RETRY_MS, makeTransport = null } = {}) {
+  constructor(servers = {}, { declineTool = null, onProblem = () => {}, retryMs = RETRY_MS, makeTransport = null, steadyMs = STEADY_MS } = {}) {
     super();
-    this.servers = servers;
-    this.declineTool = declineTool;
+    this.servers = { ...servers };
+    this.declineTool = declineTool; // "server/tool" from the settings (a connector run by another program)
+    this.ownDeclineTool = null; // "server/tool" of the app's own WhatsApp connector, while it runs
     this.onProblem = onProblem;
     this.retryMs = retryMs;
+    this.steadyMs = steadyMs;
     this.makeTransport = makeTransport;
     this.clients = new Map();
-    this.serverTools = new Map(); // server name -> its tools
-    this.toolList = [];
+    this.serverTools = new Map(); // server name -> all of its tools
+    this.allTools = [];
+    this.toolList = []; // the ones the brain may see
     this.attempts = new Map();
     this.timers = new Map();
     this.connecting = new Map();
+    this.connectedAt = new Map();
+    this.printed = new Map(); // server name -> last lines its program printed (stderr: "pipe" only)
     this.stopped = false;
   }
 
@@ -48,11 +61,29 @@ export class Connectors extends EventEmitter {
     return this;
   }
 
-  transportFor(spec) {
-    if (this.makeTransport) return this.makeTransport(spec);
-    return spec.url
-      ? new StreamableHTTPClientTransport(new URL(spec.url), spec.headers ? { requestInit: { headers: spec.headers } } : undefined)
-      : new StdioClientTransport({ command: spec.command, args: spec.args ?? [], env: { ...process.env, ...(spec.env ?? {}) }, cwd: spec.cwd, stderr: 'ignore' });
+  transportFor(spec, name) {
+    if (this.makeTransport) return this.makeTransport(spec, name);
+    if (spec.url) return new StreamableHTTPClientTransport(new URL(spec.url), spec.headers ? { requestInit: { headers: spec.headers } } : undefined);
+    const transport = new StdioClientTransport({
+      command: spec.command,
+      args: spec.args ?? [],
+      // exactEnv: only what is given (plus the few basics every program needs, added by the SDK).
+      env: spec.exactEnv ? { ...(spec.env ?? {}) } : { ...process.env, ...(spec.env ?? {}) },
+      cwd: spec.cwd,
+      stderr: spec.stderr === 'pipe' ? 'pipe' : 'ignore',
+    });
+    if (spec.stderr === 'pipe' && transport.stderr) {
+      // Always read it, or a chatty program would stop once the pipe is full.
+      const lines = [];
+      this.printed.set(name, lines);
+      readline.createInterface({ input: transport.stderr }).on('line', line => {
+        const clean = String(line).replace(/whsec_[A-Za-z0-9+/=]+/g, 'whsec_...').trim();
+        if (!clean) return;
+        lines.push(clean.slice(0, 400));
+        if (lines.length > 20) lines.shift();
+      });
+    }
+    return transport;
   }
 
   /** Connects one server (once at a time). Returns true when it is there. */
@@ -64,13 +95,15 @@ export class Connectors extends EventEmitter {
     const attempt = (async () => {
       clearTimeout(this.timers.get(name));
       this.timers.delete(name);
-      const client = new Client({ name: 'cinco-id', version: '2.5.0' });
+      const client = new Client({ name: 'cinco-id', version: '2.5.1' });
       try {
-        await client.connect(this.transportFor(spec));
+        await client.connect(this.transportFor(spec, name));
         const { tools } = await client.listTools();
-        if (this.stopped) { await client.close().catch(() => {}); return false; }
+        if (this.stopped || this.servers[name] !== spec) { await client.close().catch(() => {}); return false; }
         client.onclose = () => { if (this.clients.get(name) === client) this.lost(name); };
         this.clients.set(name, client);
+        this.connectedAt.set(name, Date.now());
+        const trusted = spec.trusted ?? [];
         this.serverTools.set(name, tools
           .filter(tool => !spec.only || spec.only.includes(tool.name))
           .map(tool => ({
@@ -80,17 +113,18 @@ export class Connectors extends EventEmitter {
             tool: tool.name,
             description: `[${name}] ${tool.description ?? ''}`.slice(0, 1000),
             parameters: tool.inputSchema ?? { type: 'object', properties: {} },
-            readOnly: tool.annotations?.readOnlyHint === true || (spec.trusted ?? []).includes(tool.name),
+            readOnly: tool.annotations?.readOnlyHint === true || trusted.includes(tool.name),
+            forBrain: !spec.brainTools || spec.brainTools.includes(tool.name),
             run: args => this.call(name, tool.name, args),
           })));
-        this.attempts.delete(name);
         this.refreshTools();
-        if (quiet) this.emit('note', `"${name}" is connected now.`);
+        if (quiet && !spec.silent) this.emit('note', `"${name}" is connected now.`);
+        this.emit('connected', name);
         return true;
       } catch (error) {
         await client.close().catch(() => {});
-        if (!quiet) this.onProblem(`Could not connect to "${name}": ${error.message}. Trying again in the background.`);
-        this.retryLater(name);
+        if (!quiet && !spec.silent) this.onProblem(`Could not connect to "${name}": ${error.message}. Trying again in the background.`);
+        this.retryLater(name, error.message);
         return false;
       } finally {
         this.connecting.delete(name);
@@ -100,13 +134,15 @@ export class Connectors extends EventEmitter {
     return attempt;
   }
 
-  retryLater(name) {
-    if (this.stopped || this.timers.has(name)) return;
+  retryLater(name, reason = null) {
+    if (this.stopped || this.timers.has(name) || !this.servers[name]) return;
     const tries = this.attempts.get(name) ?? 0;
     this.attempts.set(name, tries + 1);
-    const timer = setTimeout(() => { this.timers.delete(name); this.connect(name); }, this.retryMs[Math.min(tries, this.retryMs.length - 1)]);
+    const delay = this.retryMs[Math.min(tries, this.retryMs.length - 1)];
+    const timer = setTimeout(() => { this.timers.delete(name); this.connect(name); }, delay);
     timer.unref?.();
     this.timers.set(name, timer);
+    this.emit('retry', name, delay, reason);
   }
 
   /** A server went away: forget its tools and try again in the background. */
@@ -114,31 +150,67 @@ export class Connectors extends EventEmitter {
     const client = this.clients.get(name);
     this.clients.delete(name);
     if (client) { client.onclose = null; client.close().catch(() => {}); }
+    // One that had been there for a while starts again soon; one that keeps falling over waits longer each time.
+    const since = this.connectedAt.get(name);
+    this.connectedAt.delete(name);
+    if (since && Date.now() - since >= this.steadyMs) this.attempts.delete(name);
     if (this.serverTools.delete(name)) this.refreshTools();
-    this.retryLater(name);
+    this.emit('lost', name);
+    this.retryLater(name, 'it stopped');
   }
 
   refreshTools() {
-    this.toolList = [...this.serverTools.values()].flat();
+    this.allTools = [...this.serverTools.values()].flat();
+    this.toolList = this.allTools.filter(tool => tool.forBrain);
     this.emit('change');
   }
 
+  /** The tools the brain may use. */
   tools() { return this.toolList; }
 
-  async call(server, tool, args) {
+  isConnected(name) { return this.clients.has(name); }
+
+  /** Adds a server while the app runs (for example the app's own WhatsApp connector) and connects it. */
+  add(name, spec) {
+    this.servers[name] = spec;
+    this.attempts.delete(name);
+    return this.connect(name);
+  }
+
+  /** Stops a server added with add(): its program is asked to end, and it is not tried again. */
+  async remove(name) {
+    clearTimeout(this.timers.get(name));
+    this.timers.delete(name);
+    this.attempts.delete(name);
+    delete this.servers[name];
+    await this.connecting.get(name)?.catch(() => false);
+    const client = this.clients.get(name);
+    this.clients.delete(name);
+    this.connectedAt.delete(name);
+    if (this.serverTools.delete(name)) this.refreshTools();
+    if (client) { client.onclose = null; await client.close().catch(() => {}); }
+  }
+
+  /** Calls a tool and returns everything it answered (text, pictures). */
+  async callRaw(server, tool, args, { connect = true } = {}) {
     let client = this.clients.get(server);
-    if (!client && !(await this.connect(server))) throw new Error(`"${server}" is not connected.`);
-    client = this.clients.get(server);
-    let result;
+    if (!client) {
+      if (!connect || !(await this.connect(server))) throw new Error(`"${server}" is not connected.`);
+      client = this.clients.get(server);
+    }
     try {
-      result = await client.callTool({ name: tool, arguments: args ?? {} });
+      return await client.callTool({ name: tool, arguments: args ?? {} });
     } catch (error) {
-      if (!isConnectionProblem(error)) throw error;
+      if (!isConnectionProblem(error) || !connect) throw error;
       // The connection dropped: connect again once and try once more.
       this.lost(server);
       if (!(await this.connect(server))) throw new Error(`"${server}" is not reachable right now (${error.message}).`);
-      result = await this.clients.get(server).callTool({ name: tool, arguments: args ?? {} });
+      return this.clients.get(server).callTool({ name: tool, arguments: args ?? {} });
     }
+  }
+
+  async call(server, tool, args) {
+    const result = await this.callRaw(server, tool, args);
     const text = (result.content ?? []).map(part => (part.type === 'text' ? part.text : `[${part.type}]`)).join('\n');
     if (result.isError) throw new Error(text || 'the tool reported a problem');
     return text || 'Done.';
@@ -160,26 +232,52 @@ export class Connectors extends EventEmitter {
     }
   }
 
-  /** "server/tool" from the settings, when that tool really exists. */
-  declineTarget() {
-    if (!this.declineTool) return null;
-    const [server, tool] = this.declineTool.split('/');
-    return this.toolList.find(entry => entry.server === server && entry.tool === tool) ?? null;
+  /**
+   * Who can decline a call, best first. A call is declined by the WhatsApp connection that
+   * reported it ("own": the app's own connector; "manual": the one named in the settings).
+   * If that one is not there right now, the other one is tried.
+   */
+  declineTargets(via = null) {
+    const own = this.ownDeclineTool;
+    const manual = this.declineTool;
+    const order = via === 'own' ? [own, manual] : via === 'manual' ? [manual, own] : [manual, own];
+    const found = [];
+    for (const wanted of order) {
+      if (!wanted) continue;
+      const [server, tool] = wanted.split('/');
+      const target = this.allTools.find(entry => entry.server === server && entry.tool === tool);
+      if (target && !found.includes(target)) found.push(target);
+    }
+    return found;
   }
 
-  canDeclineCalls() { return Boolean(this.declineTarget()); }
+  /** "server/tool" from the settings, when that tool really exists (the first choice for `via`). */
+  declineTarget(via = null) { return this.declineTargets(via)[0] ?? null; }
 
-  /** Makes sure "can decline" is true only while the decline tool's server really answers. */
-  async checkDecline() {
-    if (!this.declineTool) return false;
-    await this.check(this.declineTool.split('/')[0]);
-    return this.canDeclineCalls();
+  canDeclineCalls(via = null) { return this.declineTargets(via).length > 0; }
+
+  /** Makes sure "can decline" is true only while a decline tool's server really answers. */
+  async checkDecline(via = null) {
+    const servers = [this.declineTool, this.ownDeclineTool].filter(Boolean).map(wanted => wanted.split('/')[0]);
+    if (!servers.length) return false;
+    await Promise.all([...new Set(servers)].map(server => this.check(server).catch(() => false)));
+    return this.canDeclineCalls(via);
   }
 
-  async declineCall(callId) {
-    const target = this.declineTarget();
-    if (!target) throw new Error('declining calls is not connected');
-    return this.call(target.server, target.tool, { call_id: callId });
+  async declineCall(callId, via = null) {
+    const targets = this.declineTargets(via);
+    if (!targets.length) throw new Error('declining calls is not connected');
+    let problem = null;
+    for (const target of targets) {
+      try {
+        return await this.call(target.server, target.tool, { call_id: callId });
+      } catch (error) {
+        // The tool answered (for example: the call already stopped ringing): that is the answer.
+        if (this.clients.has(target.server)) throw error;
+        problem = error;
+      }
+    }
+    throw problem ?? new Error('declining calls is not connected');
   }
 
   async stop() {
@@ -189,6 +287,7 @@ export class Connectors extends EventEmitter {
     await Promise.all([...this.clients.values()].map(client => { client.onclose = null; return client.close().catch(() => {}); }));
     this.clients.clear();
     this.serverTools.clear();
+    this.allTools = [];
     this.toolList = [];
   }
 }

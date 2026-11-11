@@ -4,7 +4,7 @@
 //   3. starts the installed app with the full play-through (its own port and data folder),
 //   4. uninstalls silently and checks that the folder, the shortcuts and the app list entry are gone.
 // It stops and reports anything it would leave behind.
-// Usage: node test/ui/install-check.mjs [dist/CINCO-ID-Setup-2.5.0.exe]
+// Usage: node test/ui/install-check.mjs [dist/CINCO-ID-Setup-2.5.1.exe]
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, promises as fs } from 'node:fs';
 import os from 'node:os';

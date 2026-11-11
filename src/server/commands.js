@@ -86,7 +86,10 @@ export function parseCommand(text, world) {
   }
   if (/^what (?:do we|have we|can you|do you) (?:have|got|do|load)/.test(said) || said === 'help') return { intent: 'list', what: 'everything' };
 
-  // The Setup window
+  // The Setup window, also straight to its WhatsApp page ("link whatsapp")
+  if (/^(?:(?:please )?(?:link|connect|pair|set up|setup|hook up|add)(?: up)?(?: to)?(?: my| the)? (?:whats ?app|what s app)(?: account| to (?:the |this )?computer)?|(?:whats ?app|what s app) (?:link|linking|setup|set up|settings))$/.test(said.replace(ASK, ''))) {
+    return { intent: 'setup', page: 'whatsapp' };
+  }
   if (/^(?:(?:open|show|show me|start|run|change|go to)(?: the| my| your)? )?(?:setup|set up|settings|preferences|options|control panel)(?: window| wizard)?$/.test(said.replace(ASK, ''))) {
     return { intent: 'setup' };
   }

@@ -56,9 +56,9 @@ print(json.dumps(out))
 `;
 
 /** Runs a program with fixed arguments and returns what it printed (no shell involved). */
-export function runProgram(command, args, { env = process.env, timeoutMs = 60_000 } = {}) {
+export function runProgram(command, args, { env = process.env, timeoutMs = 60_000, cwd = undefined } = {}) {
   return new Promise(resolve => {
-    execFile(command, args, { env, timeout: timeoutMs, windowsHide: true, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
+    execFile(command, args, { env, cwd, timeout: timeoutMs, windowsHide: true, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
       resolve({ code: error ? (typeof error.code === 'number' ? error.code : -1) : 0, stdout: String(stdout ?? ''), stderr: String(stderr ?? ''), error: error && typeof error.code !== 'number' ? error.message : null });
     });
   });

@@ -1,6 +1,7 @@
 // Drives the Setup window in the real app, the way a person would on the first start:
 //   1. starts a copy with an empty data folder: Setup opens by itself and the greeting waits,
 //   2. changes the name and the voice, tries "Say something",
+//      (the WhatsApp page is passed over; it starts nothing on its own)
 //   3. presses "Sign in to Modal" and "Prepare..." with a stand-in for Modal's tools (a small
 //      fake "modal" package put first on Python's search path), so no browser opens and
 //      nothing in the cloud is used or paid for; Prepare is first answered with No, then with Yes,
@@ -80,6 +81,14 @@ try {
   assert.equal(await setup.locator('input[name=ears][value=off]').isChecked(), true);
   await next();
   await setup.locator('input[name=brain][value=none]').check();
+  await next();
+
+  // WhatsApp (passed over: nothing is started unless "Link WhatsApp" is pressed)
+  assert.equal((await setup.locator('.setup-steps li.current').textContent()).trim(), 'WhatsApp');
+  await setup.locator('button[data-role=whatsapp-link]').waitFor({ timeout: 15000 });
+  const linkState = await page.evaluate(() => fetch('/api/setup/whatsapp').then(r => r.json()));
+  assert.equal(linkState.running, false, 'WhatsApp is not started by just looking at the page');
+  console.log(`WhatsApp page: "${(await setup.locator('[data-role=whatsapp-status]').textContent()).trim()}" (passed over)`);
   await next();
 
   // 4. New dancers, with the stand-in for Modal

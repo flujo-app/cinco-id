@@ -75,6 +75,15 @@ export async function loadConfig(rootDir, overrides = {}, { dataDir = null } = {
       maxSteps: 6,
     },
     mcpServers: {},
+    // CINCO ID's own WhatsApp link: it runs its own copy of the WhatsApp connector (mcp-whatsapp-web)
+    // as one more linked device, with its sign-in in <data>/whatsapp. "Link WhatsApp" in Setup
+    // switches it on. See whatsapp.js.
+    whatsapp: {
+      enabled: false,
+      connectorDir: null, // a folder with mcp-whatsapp-web 1.4.2 or newer; otherwise the copy Setup installed, then one next to this folder
+      lookNextDoor: true, // also use a mcp-whatsapp-web folder next to the app folder (handy when developing)
+      brainTools: ['search_contacts', 'get_contact_by_id'], // what the brain may use from it; anything beyond these two asks first
+    },
     events: {
       whatsapp: { secret: null, messages: 'sender', declineTool: null },
       generic: { secret: null },
