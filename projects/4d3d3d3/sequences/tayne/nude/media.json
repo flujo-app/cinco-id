@@ -1,0 +1,55 @@
+{
+  "clip": "loop.webm",
+  "width": 540,
+  "height": 720,
+  "fps": 24,
+  "frames": 96,
+  "stills": {
+    "default": "still.png"
+  },
+  "hatLine": 0.25,
+  "provenance": {
+    "created": "2026-11-11T06:09:20Z",
+    "models": [
+      {
+        "repo": "Tongyi-MAI/Z-Image-Turbo",
+        "revision": "f332072aa78be7aecdf3ee76d5c247082da564a6",
+        "license": "apache-2.0",
+        "role": "character picture"
+      },
+      {
+        "repo": "Lightricks/LTX-2.5",
+        "revision": "5e6e71018ee1756ed329b697a7b4aedc934dfce9",
+        "license": "ltx-2.x-community-license (free below USD 10M yearly revenue and for non-commercial hobby use)",
+        "role": "dance motion",
+        "code": "https://github.com/Lightricks/LTX-2.git@a95ab856bf29407b6b066ede0abe1846050db56c"
+      },
+      {
+        "repo": "ZhengPeng7/BiRefNet-matting",
+        "revision": "eccde0a8cbdce7ac5fecfeb06340fe7b949e85d9",
+        "license": "mit",
+        "role": "background removal"
+      }
+    ],
+    "prompts": {
+      "image": "Tayne in his silly beach costume: the same flamboyant entertainer in his forties, clean-shaven, now wearing a bright lime-green sling-style one-piece comedy swimsuit with two wide straps over the shoulders, and a big puffy yellow inflatable rubber-duck swim ring worn around his hips that completely hides everything from the belly button down to the upper thighs, together with the same white boots and the same very large wide-brimmed dark navy hat sitting on top of his head. A goofy, non-sexual beach gag costume. Dance: a confident strut on the spot, swinging the hips and rolling the shoulders. Full-body shot of the whole person from the very top of the head (or hat) down to the shoes, standing upright and facing the camera in a relaxed ready-to-dance pose with the arms a little away from the body, centred with empty space all around, nothing cropped. Plain seamless solid light grey studio backdrop with nothing else in the picture: no props, no text, no logo. Realistic video footage of a real-looking, ordinary, invented person who is not any celebrity or real individual. Early-1990s public-access TV or corporate training tape look: slightly soft analogue video picture, warm colours, bright even studio lighting.",
+      "motion": "Tayne in his silly beach costume: the same flamboyant entertainer in his forties, clean-shaven, now wearing a bright lime-green sling-style one-piece comedy swimsuit with two wide straps over the shoulders, and a big puffy yellow inflatable rubber-duck swim ring worn around his hips that completely hides everything from the belly button down to the upper thighs, together with the same white boots and the same very large wide-brimmed dark navy hat sitting on top of his head. A goofy, non-sexual beach gag costume. Dance: a confident strut on the spot, swinging the hips and rolling the shoulders. The person dances on the spot in the middle of the frame and finishes the dance back in exactly the pose they started in. The whole body stays in view from head to feet the entire time. Static locked-off camera with no zoom, no pan and no cuts. The background is a plain flat blue studio backdrop that stays perfectly even and still. Realistic early-1990s public-access TV video look. Smooth, rhythmic, slightly goofy dancing. No talking, no text.",
+      "negative": "camera movement, zoom in, zoom out, pan, tilt, cut, scene change, second person, crowd, text, subtitles, watermark, logo, cropped feet, cropped head, leaving the frame, blurry, distorted body, extra limbs, melting, morphing, flicker, talking"
+    },
+    "costUsdEstimate": 0.33,
+    "engine": "ltx",
+    "seed": 9002,
+    "backdropForCutout": "blue",
+    "seconds": 230,
+    "loop": {
+      "typicalStep": 0.01125,
+      "seamBefore": 0.00679,
+      "crossfadeFrames": 0,
+      "seamAfter": 0.00679,
+      "frames": 96
+    },
+    "clipBytes": 929983,
+    "machineGenerated": true,
+    "note": "Beach-costume variant redrawn from Tayne's picture. Clip cost: picture 0.03 + dance 0.27 + cut-out 0.04 US dollars. hatLine set by hand to the hat brim measured on the still and clip frames (0.22 to 0.26); the automatic estimate (0.277) fell at the chin."
+  }
+}
