@@ -27,5 +27,5 @@
   "events": {
     "whatsapp": { "secret": "whsec_<made by: npm run whatsapp:link>", "messages": "off", "declineTool": null }
   },
-  "printouts": { "printer": false }
+  "printouts": { "print": "pdf", "printer": "Microsoft Print to PDF" }
 }

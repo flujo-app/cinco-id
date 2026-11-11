@@ -64,7 +64,9 @@ export async function loadConfig(rootDir, overrides = {}) {
       whatsapp: { secret: null, messages: 'sender', declineTool: null },
       generic: { secret: null },
     },
-    printouts: { dir: path.join(rootDir, 'printouts'), printer: false },
+    // print: "pdf" sends each printout straight to `printer` through the Windows print system
+    // (the PDF printer then asks where to save), "dialog" shows the Windows print window, "off" only saves the picture.
+    printouts: { dir: path.join(rootDir, 'printouts'), print: 'pdf', printer: 'Microsoft Print to PDF' },
     media: { python: 'python', script: path.join(rootDir, 'tools', 'media', 'generate.py'), enabled: true },
   };
   // For tests and second copies: BETA_SEQUENCE_CONFIG=none ignores the settings file,

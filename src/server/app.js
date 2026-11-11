@@ -1,7 +1,6 @@
 import http from 'node:http';
 import path from 'node:path';
 import { promises as fs, createReadStream } from 'node:fs';
-import { spawn } from 'node:child_process';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { handleMcp } from './mcp-endpoint.js';
@@ -136,10 +135,18 @@ export async function createApp({ rootDir, overrides = {}, env = process.env, pa
     const safe = String(caption).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'printout';
     const file = path.join(config.printouts.dir, `${stamp}-${safe}.png`);
     await fs.writeFile(file, Buffer.from(match[1], 'base64'));
-    if (config.printouts.printer && process.platform === 'win32') {
-      spawn('mspaint.exe', ['/pt', file], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
+    // A real print job, when the desktop shell gave us a printer and printing is switched on.
+    let printing = null;
+    if (parts.printer && config.printouts.print !== 'off') {
+      printing = config.printouts.print === 'dialog' ? 'the Windows print window' : config.printouts.printer;
+      parts.printer({ file, caption, url: `http://127.0.0.1:${port}/print/${encodeURIComponent(path.basename(file))}`, settings: config.printouts })
+        .then(result => {
+          if (result?.success) computer.send({ type: 'note', text: `Printout "${caption}" was handed to ${result.printer ?? 'the printer'}.` });
+          else if (result?.reason && !/cancel/i.test(result.reason)) computer.problem(`Printing did not work: ${result.reason}`);
+        })
+        .catch(error => computer.problem(`Printing did not work: ${error.message}`));
     }
-    return file;
+    return { file, printing };
   }
 
   const server = http.createServer(async (request, response) => {
@@ -173,6 +180,17 @@ export async function createApp({ rootDir, overrides = {}, env = process.env, pa
         if (route.startsWith('/ui/')) return serveFile(response, UI_DIR, route.slice(4));
         if (route.startsWith('/projects/')) return serveFile(response, config.projectsDir, route.slice(10), { mediaOnly: true });
         if (route.startsWith('/printouts/')) return serveFile(response, config.printouts.dir, route.slice(11), { mediaOnly: true });
+        if (route.startsWith('/print/')) {
+          // One printout laid out on a sheet of paper, for the Windows printer.
+          const name = route.slice(7);
+          const known = /^[\w-][\w.-]*\.png$/.test(name)
+            && await fs.access(path.join(config.printouts.dir, name)).then(() => true, () => false);
+          if (!known) return send(response, 404, 'Not found.');
+          const title = name.replace(/^\d{4}-\d\d-\d\dT[\d-]+-/, '').replace(/\.png$/, '').replace(/-/g, ' ');
+          return send(response, 200, `<!doctype html><html><head><meta charset="utf-8"><title>Printout ${title}</title>`
+            + '<style>@page{size:A4;margin:12mm}html,body{margin:0;background:#fff}img{display:block;margin:0 auto;max-width:100%;max-height:270mm}</style>'
+            + `</head><body><img src="/printouts/${encodeURIComponent(name)}" alt=""></body></html>`, { 'content-type': 'text/html; charset=utf-8' });
+        }
         if (route === '/api/state') return send(response, 200, { ...computer.snapshot(), voice: voiceInfo(), notes });
         if (route === '/api/tts') {
           const file = await speaker.speak(url.searchParams.get('text') ?? '').catch(error => { notes.push(`Voice: ${error.message}`); return null; });
@@ -195,8 +213,8 @@ export async function createApp({ rootDir, overrides = {}, env = process.env, pa
           return send(response, 200, { text });
         }
         if (route === '/api/printouts') {
-          const file = await savePrintout(JSON.parse((await readBody(request)).toString('utf8')));
-          return send(response, 200, { ok: true, file, url: `/printouts/${path.basename(file)}` });
+          const { file, printing } = await savePrintout(JSON.parse((await readBody(request)).toString('utf8')));
+          return send(response, 200, { ok: true, file, url: `/printouts/${path.basename(file)}`, printing });
         }
         return send(response, 404, 'Not found.');
       }

@@ -129,7 +129,8 @@ const builders = {
         body: JSON.stringify({ caption: desc.caption, dataUrl: paper.toDataURL('image/png') }),
       });
       const result = await response.json();
-      status.textContent = result.ok ? `Saved: ${result.file.split(/[\\/]/).slice(-2).join('/')}` : `Could not save: ${result.error}`;
+      status.textContent = !result.ok ? `Could not save: ${result.error}`
+        : result.printing ? `Sent to ${result.printing}` : `Saved: ${result.file.split(/[\\/]/).slice(-2).join('/')}`;
     }).catch(error => { status.textContent = `Could not print: ${error.message}`; });
   },
 

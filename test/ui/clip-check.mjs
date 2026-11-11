@@ -17,7 +17,7 @@ if (!names.length) { console.error('Give at least one sequence name.'); process.
 const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'beta-sequence-clip-'));
 
 const app = await electron.launch({
-  args: ['.', '--port=19784', '--silent', '--no-tray'],
+  args: ['.', '--port=19784', '--silent', '--no-tray', '--no-print'],
   cwd: root,
   env: {
     ...process.env, BETA_SEQUENCE_CONFIG: 'none', BETA_SEQUENCE_STATE_DIR: path.join(temp, 'state'),

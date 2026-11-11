@@ -14,7 +14,7 @@ const shots = args.find(arg => !arg.startsWith('--')) ?? null;
 const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'beta-sequence-ui-'));
 
 const app = await electron.launch({
-  args: ['.', '--port=19781', '--silent', '--no-tray', ...(overlay ? ['--overlay'] : [])],
+  args: ['.', '--port=19781', '--silent', '--no-tray', '--no-print', ...(overlay ? ['--overlay'] : [])],
   cwd: root,
   env: {
     ...process.env,

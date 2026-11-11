@@ -38,7 +38,7 @@ function programAt(x, y) {
 }
 
 const app = await electron.launch({
-  args: ['.', '--port=19783', '--silent', '--no-tray', '--overlay'],
+  args: ['.', '--port=19783', '--silent', '--no-tray', '--no-print', '--overlay'],
   cwd: root,
   env: { ...process.env, BETA_SEQUENCE_CONFIG: 'none', BETA_SEQUENCE_STATE_DIR: path.join(temp, 'state'), BETA_SEQUENCE_PRINTOUTS_DIR: path.join(temp, 'printouts') },
 });
