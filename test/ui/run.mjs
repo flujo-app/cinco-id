@@ -55,11 +55,25 @@ try {
     await page.waitForTimeout(settle);
   };
 
+  // The start, as in the sketch: the start window with "please wait...", then the greeting, typed out.
+  if (!overlay) {
+    await page.waitForSelector('.window.kind-splash', { timeout: 5000 });
+    assert.match(await page.locator('.kind-splash .wait-text').textContent(), /please wait/);
+    await picture('start');
+  }
   await page.waitForFunction(() => /first sequence of the day/.test(document.querySelector('.console-log')?.textContent ?? ''), null, { timeout: 8000 });
+  assert.equal(await page.locator('.kind-console .title-text').textContent(), "Paul's COMPUTER");
+  await page.waitForFunction(() => !document.querySelector('.window.kind-splash'), null, { timeout: 8000 });
   await picture('greeting');
 
   await say('Computer, load up Celery Man please.', 'Yes, Paul.');
-  assert.equal(await count('.window.kind-sequence'), 1, 'one dancer window');
+  assert.equal(await count('.window.kind-sequence'), 2, 'the whole dancer and a close-up');
+  assert.equal(await count('.window.kind-sequence.blue .backdrop-pink'), 1, 'the close-up: blue bar, pink backdrop');
+  assert.equal(await page.locator('.window.kind-sequence.blue .name-row').textContent(), 'Celery Man');
+  // The line is typed out letter by letter; while that happens the rest is there but invisible.
+  await say('wobble', 'Yes.', 0);
+  await page.waitForFunction(() => document.querySelector('.console-log > div:last-child .untyped')?.textContent === '', null, { timeout: 4000 });
+  await say('normal', 'Yes.');
   await picture('celery-man');
 
   await say('Could you kick up the 4d3d3d3?', '4d3d3d3 engaged.', 2200);
@@ -75,11 +89,27 @@ try {
   await picture('printout');
 
   await say('Computer, do we have any new sequences?', 'I have a BETA sequence I have been working on. Would you like to see it?');
-  await say('Alright.', 'Tayne.', 900);
+  if (!overlay) {
+    assert.ok(await count('.window.kind-console.big'), 'the beta offer comes in the big window');
+    assert.equal(await page.locator('.console-log > div:last-child br').count(), 2, 'on three lines, as in the sketch');
+  }
+  await picture('beta-offer');
+  await page.fill('.console-row input', 'Alright.');
+  await page.press('.console-row input', 'Enter');
+  await page.waitForSelector('.window.kind-progress', { timeout: 3000 });
+  assert.equal(await page.locator('.kind-progress .pad').textContent(), 'Loading BETA, please wait...');
+  assert.equal(await count('.window.kind-console.big'), 0, 'the computer window is back in its corner');
+  await picture('loading-beta');
+  await say('', 'Tayne.', 900);
+  assert.equal(await count('.window.kind-progress'), 0);
+  assert.equal(await count('.window.kind-sequence.blue .backdrop-pink'), await count('.window.kind-sequence.blue'), 'close-ups and the title card are pink');
+  await picture('tayne');
   await say('Now Tayne I can get into.', null);
-  await say('Can I get a hat wobble?', 'Yes.');
+  await say('Can I get a hat wobble?', 'Yes.', 900);
+  await picture('hat-wobble');
   await say('And a Flarhgunnstow?', 'Yes.', 900);
-  await picture('tayne-effects');
+  assert.equal(await count('.window.kind-sequence.free'), 1, 'the dancer steps out of the window');
+  await picture('flarhgunnstow');
 
   await say('Is there any way to generate a nude Tayne?', 'Not computing. Please repeat.');
   await say('Nude. Tayne.', 'This is not suitable for work. Are you sure?');
@@ -92,9 +122,13 @@ try {
   await say('test call from my wife', null, 700);
   assert.equal(await count('.window.kind-call'), 1, 'an incoming call window');
   assert.match(await page.locator('.kind-call .call-name').textContent(), /My Wife/);
+  assert.equal(await page.locator('.kind-call .name-row').textContent(), 'INCOMING CALL');
+  assert.equal(await count('.kind-call canvas'), 3, 'the number display, the ringing phone and the name in big letters');
+  assert.ok(await page.evaluate(() => document.body.classList.contains('ringing')), 'the screen goes pale while it rings');
   await picture('call');
   await page.click('.kind-call button:has-text("Decline")');
   await page.waitForFunction(() => !document.querySelector('.window.kind-call'), null, { timeout: 4000 });
+  assert.ok(!await page.evaluate(() => document.body.classList.contains('ringing')));
 
   // Drawing must actually happen: a dancer canvas may not be blank.
   const painted = await page.evaluate(() => {
@@ -116,6 +150,21 @@ try {
 
   await say('clear the desktop', 'Desktop cleared.');
   assert.equal(await count('.window.kind-sequence'), 0);
+
+  // "Please choose a sequence": a picture of every dancer; a click loads it.
+  await say('choose a sequence', '2 projects, 5 sequences.');
+  assert.equal(await count('.window.kind-chooser'), 1);
+  assert.ok(await count('.kind-chooser .chooser-tile') >= 5);
+  await picture('choose');
+  await page.click('.kind-chooser .chooser-tile:has-text("Oyster")');
+  await page.waitForFunction(() => document.querySelectorAll('.window.kind-sequence').length === 2 && !document.querySelector('.window.kind-chooser'), null, { timeout: 5000 });
+
+  // Minimised windows become little icons along the bottom; a click brings them back.
+  await page.click('.window.kind-sequence:not(.blue) .tb-min');
+  assert.equal(await count('#tasks .task-button'), 1);
+  await page.click('#tasks .task-button');
+  assert.equal(await count('#tasks .task-button'), 0);
+  await say('clear the desktop', 'Desktop cleared.');
   assert.deepEqual(problems, [], 'no errors on the page');
   console.log('UI run passed.');
 } catch (error) {

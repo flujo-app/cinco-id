@@ -68,8 +68,12 @@ async function keptToken(file) {
   return token;
 }
 
-/** Serves one file from inside `root`, refusing anything that tries to leave it. */
-async function serveFile(response, root, relative, { mediaOnly = false } = {}) {
+/**
+ * Serves one file from inside `root`, refusing anything that tries to leave it. `range` is the
+ * request's Range header: the screen asks for clips and music in pieces (to open the same clip
+ * more than once and to start in the middle of it), so a part of the file can be sent too.
+ */
+async function serveFile(response, root, relative, { mediaOnly = false, range = null } = {}) {
   const file = path.normalize(path.join(root, relative));
   if (!file.startsWith(path.normalize(root + path.sep))) return send(response, 403, 'Not allowed.');
   const extension = path.extname(file).toLowerCase();
@@ -77,7 +81,20 @@ async function serveFile(response, root, relative, { mediaOnly = false } = {}) {
   try {
     const info = await fs.stat(file);
     if (!info.isFile()) throw new Error('not a file');
-    response.writeHead(200, { 'content-type': TYPES[extension], 'content-length': info.size, 'cache-control': 'no-cache', 'accept-ranges': 'none' });
+    const headers = { 'content-type': TYPES[extension], 'cache-control': 'no-cache', 'accept-ranges': 'bytes', 'last-modified': info.mtime.toUTCString() };
+    const part = /^bytes=(\d*)-(\d*)$/.exec(String(range ?? '').trim());
+    if (part && (part[1] !== '' || part[2] !== '')) {
+      // "bytes=100-199", "bytes=100-" (from 100 to the end) or "bytes=-50" (the last 50).
+      const start = part[1] === '' ? Math.max(0, info.size - Number(part[2])) : Number(part[1]);
+      const end = part[1] !== '' && part[2] !== '' ? Math.min(Number(part[2]), info.size - 1) : info.size - 1;
+      if (start >= info.size || start > end) {
+        response.writeHead(416, { ...headers, 'content-range': `bytes */${info.size}`, 'content-length': 0 });
+        return response.end();
+      }
+      response.writeHead(206, { ...headers, 'content-range': `bytes ${start}-${end}/${info.size}`, 'content-length': end - start + 1 });
+      return createReadStream(file, { start, end }).pipe(response);
+    }
+    response.writeHead(200, { ...headers, 'content-length': info.size });
     createReadStream(file).pipe(response);
   } catch {
     send(response, 404, 'Not found.');
@@ -244,8 +261,8 @@ export async function createApp({ rootDir, dataDir = null, overrides = {}, env =
 
       if (request.method === 'GET') {
         if (route === '/' || route === '/index.html') return serveFile(response, UI_DIR, 'index.html');
-        if (route.startsWith('/ui/')) return serveFile(response, UI_DIR, route.slice(4));
-        if (route.startsWith('/projects/')) return serveFile(response, config.projectsDir, route.slice(10), { mediaOnly: true });
+        if (route.startsWith('/ui/')) return serveFile(response, UI_DIR, route.slice(4), { range: request.headers.range });
+        if (route.startsWith('/projects/')) return serveFile(response, config.projectsDir, route.slice(10), { mediaOnly: true, range: request.headers.range });
         if (route.startsWith('/printouts/')) return serveFile(response, config.printouts.dir, route.slice(11), { mediaOnly: true });
         if (route.startsWith('/print/')) {
           // One printout laid out on a sheet of paper, for the Windows printer.

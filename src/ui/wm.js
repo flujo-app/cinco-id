@@ -1,17 +1,29 @@
-// A small Win95-style window manager: open, close, drag, minimise, maximise, taskbar,
-// plus the window-level effects (drift, conga, giant, tiny, free).
+// A small window manager in the look of the computer in the sketch: open, close, drag, minimise,
+// maximise, plus the window-level effects (drift, conga, giant, tiny, free).
+//
+// Two kinds of window frame, both from the sketch:
+//   plain  a white title bar with the title, a "Close" button and the two small arrow buttons
+//   blue   a blue bar instead of the title, the title on its own line underneath, and a thin
+//          strip at the bottom (the close-up windows and the incoming call)
 
 const SIZES = {
-  sequence: { small: [128, 170], medium: [186, 248], large: [276, 368] },
-  console: [400, 290],
+  // by shot, then by size: [width, height] of the picture
+  sequence: {
+    full: { small: [128, 170], medium: [186, 248], large: [276, 368], wide: [400, 300] },
+    closeup: { small: [160, 120], medium: [216, 162], large: [288, 216], wide: [288, 216] },
+    face: { small: [128, 170], medium: [186, 248], large: [246, 328], wide: [246, 328] },
+    title: { small: [208, 146], medium: [272, 190], large: [330, 232], wide: [330, 232] },
+  },
+  console: [440, 172],
   dialog: [340, null],
-  call: [310, null],
-  printout: [300, 400],
+  call: [236, null],
+  printout: [320, 426],
   note: [350, null],
-  progress: [330, null],
+  progress: [400, null],
   setup: [580, 420],
+  splash: [470, null],
+  chooser: [470, null],
 };
-const TITLE_H = 22;
 const WINDOW_EFFECTS = new Set(['drift', 'conga', 'giant', 'tiny', 'free']);
 
 function seeded(text) {
@@ -34,11 +46,13 @@ function el(tag, className, text) {
 }
 
 export class WindowManager {
-  constructor({ desktop, tasks, builders, onClosed }) {
+  constructor({ desktop, tasks, builders, onClosed, onChanged }) {
     this.desktop = desktop;
     this.tasks = tasks;
     this.builders = builders;
     this.onClosed = onClosed;
+    this.onChanged = onChanged; // a window was opened or closed
+    this.stacks = new Map(); // where each cascade of windows starts
     this.windows = new Map();
     this.z = 10;
     this.cascade = 0;
@@ -73,37 +87,67 @@ export class WindowManager {
     const clampX = x => Math.max(0, Math.min(W - width, x));
     const clampY = y => Math.max(0, Math.min(H - height, y));
     if (desc.kind === 'sequence') {
+      if (desc.stack) {
+        // A neat pile: every window a step further along than the one before.
+        const [dx, dy] = desc.stack.step ?? [26, 24];
+        const count = Math.max(1, desc.stack.count ?? 1);
+        if (!this.stacks.has(desc.stack.id)) {
+          const base = seeded(desc.stack.id);
+          const spanX = dx * (count - 1) + width;
+          const spanY = dy * (count - 1) + height;
+          this.stacks.set(desc.stack.id, [
+            Math.max(0, W * 0.3 + base() * Math.max(0, W * 0.66 - spanX)),
+            Math.max(0, H * 0.04 + base() * Math.max(0, H * 0.9 - spanY)),
+          ]);
+          if (this.stacks.size > 40) this.stacks.delete(this.stacks.keys().next().value);
+        }
+        const [x0, y0] = this.stacks.get(desc.stack.id);
+        return [clampX(x0 + dx * desc.stack.index), clampY(y0 + dy * desc.stack.index)];
+      }
+      if (desc.spot === 'left') return [clampX(W * 0.2 - width / 2), clampY(H * 0.44 - height / 2)];
       if (desc.group) return [clampX(random() * (W - width)), clampY(random() * (H - height))];
-      const others = [...this.windows.values()].filter(record => record.desc.kind === 'sequence').length;
-      if (!others) return [clampX(W * 0.5 - width / 2), clampY(H * 0.46 - height / 2)];
-      return [clampX(W * 0.5 - width / 2 + (random() - 0.5) * W * 0.55), clampY(H * 0.46 - height / 2 + (random() - 0.5) * H * 0.3)];
+      // As in the sketch: the whole dancer to the right, the close-up to the left of it.
+      const others = [...this.windows.values()].filter(record => record.desc.kind === 'sequence' && !record.desc.group && record !== this.windows.get(desc.id)).length;
+      const loose = others > 1 ? 1 : 0;
+      if (desc.shot === 'closeup') return [clampX(W * 0.3 - width / 2 + (random() - 0.5) * W * 0.3 * loose), clampY(H * 0.36 - height / 2 + (random() - 0.5) * H * 0.4 * loose)];
+      if (desc.shot === 'title') return [clampX(W * 0.34 - width / 2), clampY(H * 0.46 - height / 2)];
+      return [clampX(W * 0.66 - width / 2 + (random() - 0.5) * W * 0.4 * loose), clampY(H * 0.45 - height / 2 + (random() - 0.5) * H * 0.3 * loose)];
     }
-    if (desc.kind === 'console') return [16, clampY(H - height - 16)];
+    if (desc.kind === 'console') return [16, clampY(H - height - 12)];
     if (desc.kind === 'dialog') return [clampX((W - width) / 2), clampY(H * 0.32)];
-    if (desc.kind === 'setup') return [clampX((W - width) / 2), clampY((H - height) / 2)];
-    if (desc.kind === 'call') return [clampX(W - width - 24 - (this.cascade % 4) * 18), 24 + (this.cascade++ % 4) * 18];
+    if (desc.kind === 'setup' || desc.kind === 'chooser') return [clampX((W - width) / 2), clampY((H - height) / 2)];
+    if (desc.kind === 'splash') return [clampX((W - width) / 2), clampY(H * 0.42 - height / 2)];
+    if (desc.kind === 'call') {
+      const slot = this.cascade++ % 4;
+      return [clampX((W - width) / 2 + slot * 22), clampY(H * 0.4 - height / 2 + slot * 22)];
+    }
     if (desc.kind === 'printout') return [clampX(W - width - 60), clampY(H * 0.2)];
-    if (desc.kind === 'progress') return [clampX(W - width - 24), clampY(H - 150)];
+    if (desc.kind === 'progress') return [clampX((W - width) / 2), clampY(H * 0.4 - height / 2)];
     const slot = this.cascade++ % 6;
     return [clampX(40 + slot * 22), clampY(40 + slot * 22)];
   }
 
   create(desc) {
     if (this.windows.has(desc.id)) return this.windows.get(desc.id);
-    const size = desc.kind === 'sequence' ? SIZES.sequence[desc.size] ?? SIZES.sequence.medium : SIZES[desc.kind] ?? SIZES.note;
+    const shots = SIZES.sequence[desc.shot] ?? SIZES.sequence.full;
+    const size = desc.kind === 'sequence' ? shots[desc.size] ?? shots.medium : SIZES[desc.kind] ?? SIZES.note;
     const [bodyW, bodyH] = size;
-    const frame = el('div', `window kind-${desc.kind}`);
+    const blue = desc.kind === 'call' || (desc.kind === 'sequence' && (desc.shot === 'closeup' || desc.shot === 'title'));
+    const frame = el('div', `window kind-${desc.kind}${blue ? ' blue' : ''}`);
     const titleBar = el('div', 'title-bar');
+    const menuBox = el('div', 'tb-menu'); // the little box on the left; a double click closes, as it used to
     const titleText = el('div', 'title-text', desc.title ?? '');
-    const controls = el('div', 'title-controls');
+    const bar = blue ? el('div', 'title-fill') : titleText;
+    const close = el('button', 'tb-button tb-close', 'Close');
     const minimise = el('button', 'tb-button tb-min');
     const maximise = el('button', 'tb-button tb-max');
-    const close = el('button', 'tb-button tb-close');
     minimise.title = 'Minimise'; maximise.title = 'Maximise'; close.title = 'Close';
-    controls.append(minimise, maximise, close);
-    titleBar.append(titleText, controls);
+    titleBar.append(menuBox, bar, close, minimise, maximise);
     const body = el('div', 'window-body');
-    frame.append(titleBar, body);
+    frame.append(titleBar);
+    if (blue) { titleText.className = 'name-row'; frame.append(titleText); }
+    frame.append(body);
+    if (blue) frame.append(el('div', 'foot-row'));
     frame.style.width = `${bodyW + 8}px`;
     if (bodyH) body.style.height = `${bodyH}px`;
 
@@ -111,7 +155,7 @@ export class WindowManager {
     this.windows.set(desc.id, record);
     this.desktop.append(frame);
     this.builders[desc.kind]?.(record, desc, this);
-    const height = bodyH ? bodyH + TITLE_H + 8 : frame.offsetHeight;
+    const height = frame.offsetHeight;
     [record.x, record.y] = this.place(desc, bodyW + 8, height);
     record.height = height;
     this.position(record);
@@ -119,6 +163,7 @@ export class WindowManager {
     this.applyWindowEffects(record, desc.effects ?? []);
 
     close.addEventListener('click', event => { event.stopPropagation(); this.close(desc.id, { byHand: true }); });
+    menuBox.addEventListener('dblclick', event => { event.stopPropagation(); this.close(desc.id, { byHand: true }); });
     minimise.addEventListener('click', event => { event.stopPropagation(); this.minimise(record, true); });
     maximise.addEventListener('click', event => { event.stopPropagation(); this.toggleMaximise(record); });
     frame.addEventListener('pointerdown', () => this.focus(desc.id));
@@ -127,6 +172,7 @@ export class WindowManager {
     setTimeout(() => frame.classList.remove('opening'), 160);
     if (desc.autoClose) setTimeout(() => this.close(desc.id, { byHand: true }), desc.autoClose);
     this.refreshTasks();
+    this.onChanged?.();
     return record;
   }
 
@@ -141,13 +187,13 @@ export class WindowManager {
     for (const other of this.windows.values()) other.frame.classList.toggle('active', other === record);
     // The console, questions and calls always stay above the dancers, however many there are.
     // A call even comes in front of the Setup window (so "Test call window" there is seen).
-    const layer = { console: 1_000_000, dialog: 3_000_000, call: 2_700_000, setup: 2_500_000 }[record.desc.kind] ?? 0;
+    const layer = { console: 1_000_000, dialog: 3_000_000, call: 2_700_000, setup: 2_500_000, splash: 1_500_000, chooser: 1_400_000, progress: 1_200_000 }[record.desc.kind] ?? 0;
     record.frame.style.zIndex = String(layer + ++this.z);
   }
 
   makeDraggable(record, handle) {
     handle.addEventListener('pointerdown', event => {
-      if (event.target.closest('.tb-button') || record.maximised) return;
+      if (event.target.closest('.tb-button, .tb-menu') || record.maximised) return;
       const startX = event.clientX - record.x;
       const startY = event.clientY - record.y;
       record.dragging = true;
@@ -192,6 +238,7 @@ export class WindowManager {
     record.frame.remove();
     if (byHand) this.onClosed?.(id, record.desc);
     this.refreshTasks();
+    this.onChanged?.();
   }
 
   closeAll(filter = () => true) {
@@ -237,7 +284,7 @@ export class WindowManager {
       let any = false;
       for (const record of this.windows.values()) {
         if (record.dragging || record.minimised || record.maximised) continue;
-        const w = record.bodyW + 8;
+        const w = record.frame.offsetWidth || record.bodyW + 8;
         const h = record.height ?? 200;
         if (record.congaSlot !== undefined) {
           any = true;
@@ -264,7 +311,7 @@ export class WindowManager {
     requestAnimationFrame(tick);
   }
 
-  // ---------- taskbar ----------
+  // ---------- minimised windows: little icons along the bottom, as before there were taskbars ----------
 
   refreshTasks() {
     if (this.refreshing) return;
@@ -273,6 +320,7 @@ export class WindowManager {
       this.refreshing = false;
       const groups = new Map();
       for (const record of this.windows.values()) {
+        if (!record.minimised) continue;
         const title = record.desc.title ?? '';
         if (!groups.has(title)) groups.set(title, []);
         groups.get(title).push(record);
@@ -284,12 +332,10 @@ export class WindowManager {
           this.tasks.append(el('div', 'task-more', `+${groups.size - 9} more`));
           break;
         }
-        const button = el('button', 'task-button', records.length > 1 ? `${title} (${records.length})` : title);
-        button.addEventListener('click', () => {
-          const allMinimised = records.every(record => record.minimised);
-          for (const record of records) this.minimise(record, false);
-          if (!allMinimised) for (const record of records) this.focus(record.id);
-        });
+        const button = el('button', 'task-button');
+        button.append(el('i', 'task-art'), el('span', '', records.length > 1 ? `${title} (${records.length})` : title));
+        button.title = 'Click to bring it back';
+        button.addEventListener('click', () => { for (const record of records) this.minimise(record, false); });
         this.tasks.append(button);
       }
     });

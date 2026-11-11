@@ -7,14 +7,15 @@ import { fileURLToPath } from 'node:url';
 import { Library } from '../src/server/projects.js';
 import { Computer, spellHex } from '../src/server/computer.js';
 import { hexFromSpeech } from '../src/server/text.js';
-import { findEffect, improviseEffect } from '../src/server/effects.js';
+import { findEffect, improviseEffect, showVariation } from '../src/server/effects.js';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'projects');
 
 async function boot(options = {}) {
   const library = await new Library(options.root ?? root).reload();
   let clock = 1_000_000;
-  const computer = new Computer({ library, config: { operator: 'Paul', ...(options.config ?? {}) }, now: () => clock, ...options.extra });
+  // pace.beta 0: no waiting at the "Loading BETA, please wait..." bar in tests.
+  const computer = new Computer({ library, config: { operator: 'Paul', pace: { beta: 0 }, ...(options.config ?? {}) }, now: () => clock, ...options.extra });
   const actions = [];
   computer.on('action', action => actions.push(action));
   const said = () => actions.filter(action => action.type === 'say').map(action => action.text);
@@ -37,11 +38,24 @@ test('spoken hex ids are understood', () => {
 test('known effects are found, made-up words stay made-up but repeatable', () => {
   assert.equal(findEffect('hat wobble'), 'hatWobble');
   assert.equal(findEffect('wobble'), 'wobble');
-  assert.equal(findEffect('flarhgunnstow'), null);
-  const first = improviseEffect('Flarhgunnstow');
-  const second = improviseEffect('flarhgunnstow');
+  assert.equal(findEffect('flarhgunnstow'), 'flarhgunnstow', 'the number from the sketch is a known one');
+  assert.equal(findEffect('Flargunstow'), 'flarhgunnstow', 'however the microphone spells it');
+  assert.equal(findEffect('blorptangle'), null);
+  const first = improviseEffect('Blorptangle');
+  const second = improviseEffect('blorptangle');
   assert.deepEqual(first.recipe, second.recipe);
   assert.ok(first.recipe.length >= 2);
+  // A word the computer once learned must not hide a real effect of the same name.
+  assert.equal(findEffect('flarhgunnstow', { flarhgunnstow: first }), 'flarhgunnstow');
+  assert.equal(findEffect('wobble', { wobble: first }), 'wobble');
+});
+
+test('a big show mixes whole dancers on white with close-ups on pink', () => {
+  const shots = Array.from({ length: 60 }, (_, i) => showVariation(i, 'demo', ['tumble']));
+  assert.ok(shots.some(shot => shot.shot === 'closeup' && shot.backdrop === 'pink'));
+  assert.ok(shots.filter(shot => shot.shot === 'full' && shot.backdrop === 'white').length > 20);
+  assert.ok(shots.every(shot => ['full', 'closeup'].includes(shot.shot) && ['white', 'pink', 'pastel', 'blue'].includes(shot.backdrop)));
+  assert.deepEqual(showVariation(7, 'demo', ['tumble']), showVariation(7, 'demo', ['tumble']), 'the same every time');
 });
 
 test('the whole routine from the sketch works line by line', async () => {
@@ -53,8 +67,9 @@ test('the whole routine from the sketch works line by line', async () => {
 
   await computer.hear('Computer, load up Celery Man please.');
   assert.equal(lastSaid(), 'Yes, Paul.');
-  assert.equal(windows('sequence').length, 1);
-  assert.equal(windows('sequence')[0].sequence.name, 'Celery Man');
+  assert.deepEqual(windows('sequence').map(window => [window.sequence.name, window.title, window.shot, window.backdrop]),
+    [['Celery Man', 'Celery Man', 'full', 'white'], ['Celery Man', 'Celery Man', 'closeup', 'pink']],
+    'as in the sketch: the whole dancer on white and a close-up on pink');
 
   await computer.hear('Could you kick up the 4d3d3d3?');
   assert.equal(lastSaid(), '4d3d3d3 engaged.');
@@ -64,7 +79,8 @@ test('the whole routine from the sketch works line by line', async () => {
 
   await computer.hear('Add sequence: Oyster.');
   assert.equal(lastSaid(), 'Sequence added.');
-  assert.ok(windows('sequence').some(window => window.sequence.name === 'Oyster'));
+  assert.deepEqual(windows('sequence').filter(window => window.sequence.name === 'Oyster').map(window => [window.shot, window.size, window.backdrop]),
+    [['full', 'wide', 'pastel'], ['closeup', 'medium', 'pink']], 'the added sequence gets the wide pastel window');
 
   await computer.hear('Give me a printout of Oyster smiling.');
   assert.equal(lastSaid(), 'Printing.');
@@ -74,11 +90,14 @@ test('the whole routine from the sketch works line by line', async () => {
 
   await computer.hear('Computer, do we have any new sequences?');
   assert.equal(lastSaid(), 'I have a BETA sequence I have been working on. Would you like to see it?');
+  assert.equal(actions.findLast(action => action.type === 'say').key, 'betaOffer', 'the screen is told this is the beta offer (it gets the big window)');
   assert.ok(!windows('sequence').some(window => window.sequence.name === 'Tayne'));
 
   await computer.hear('Alright.');
   assert.equal(lastSaid(), 'Tayne.');
-  assert.ok(windows('sequence').some(window => window.sequence.name === 'Tayne'));
+  assert.deepEqual(windows('sequence').filter(window => window.sequence.name === 'Tayne').map(window => window.shot), ['face', 'title'],
+    'the face in one window, the name in big letters in another');
+  assert.equal(windows('progress').length, 0, 'the "Loading BETA" bar is gone again');
 
   const before = said().length;
   await computer.hear('Now Tayne I can get into.');
@@ -90,11 +109,26 @@ test('the whole routine from the sketch works line by line', async () => {
   assert.ok(tayne()[0].effects.some(effect => effect.effect === 'hatWobble'));
   assert.ok(!windows('sequence').find(window => window.sequence.name === 'Oyster').effects.some(effect => effect.effect === 'hatWobble'),
     'the effect goes to the sequence being talked about');
+  const pile = tayne().filter(window => window.stack);
+  assert.equal(pile.length, 6, 'a neat pile of Tayne windows, as in the sketch');
+  assert.deepEqual(pile.map(window => window.stack.index), [0, 1, 2, 3, 4, 5]);
+  assert.ok(pile.every(window => window.effects.some(effect => effect.effect === 'hatWobble')));
+  const withHat = tayne().length;
+  await computer.hear('hat wobble');
+  assert.equal(tayne().length, withHat, 'asking again wobbles harder but opens nothing new');
 
   await computer.hear('And a Flarhgunnstow?');
   assert.equal(lastSaid(), 'Yes.');
-  assert.ok(tayne()[0].effects.length >= 3, 'the made-up word turned into real effects');
-  assert.ok(computer.learned.flarhgunnstow, 'and the computer remembers the word');
+  assert.deepEqual(tayne().map(window => [window.shot, window.effects.map(effect => effect.effect).join()]),
+    [['full', 'free'], ['closeup', ''], ['closeup', ''], ['closeup', '']],
+    'the dancer steps out of the window, with three close-ups beside it');
+  assert.equal(computer.learned.flarhgunnstow, undefined, 'a known number is not a made-up word');
+  assert.ok(windows('sequence').some(window => window.sequence.name === 'Oyster'), 'the others stay');
+
+  await computer.hear('And a Blorptangle?');
+  assert.equal(lastSaid(), 'Yes.');
+  assert.ok(tayne()[0].effects.length >= 3, 'a made-up word turns into real effects');
+  assert.ok(computer.learned.blorptangle, 'and the computer remembers the word');
 
   await computer.hear('Is there any way to generate a nude Tayne?');
   assert.equal(lastSaid(), 'Not computing. Please repeat.');
@@ -110,6 +144,38 @@ test('the whole routine from the sketch works line by line', async () => {
   assert.equal(tayne()[0].sequence.variant, 'nude');
   assert.equal(tayne()[0].sequence.puppet.style.mankini, '#9be22a');
   assert.equal(tayne()[0].sequence.puppet.style.hat, 'wide', 'the hat stays on');
+});
+
+test('the beta sequence loads behind a "please wait" bar', async () => {
+  const { computer, lastSaid } = await boot({ config: { pace: { beta: 40 } } });
+  const kinds = () => [...computer.windows.values()].map(window => window.kind);
+  await computer.hear('any new sequences?');
+  const answered = computer.hear('yes');
+  await new Promise(resolve => setTimeout(resolve, 5));
+  assert.deepEqual(kinds(), ['progress']);
+  assert.equal([...computer.windows.values()][0].text, 'Loading BETA, please wait...');
+  await answered;
+  assert.deepEqual(kinds(), ['sequence', 'sequence']);
+  assert.equal(lastSaid(), 'Tayne.');
+});
+
+test('"choose a sequence" shows every dancer, the beta one only once it was revealed', async () => {
+  const { computer } = await boot();
+  const chooser = () => [...computer.windows.values()].filter(window => window.kind === 'chooser');
+  await computer.hear('choose a sequence');
+  assert.equal(chooser().length, 1);
+  const demo = chooser()[0].projects.find(project => project.id === '4d3d3d3');
+  assert.deepEqual(demo.sequences.map(entry => entry.name).sort(), ['BETA', 'Celery Head', 'Celery Man', 'Oyster']);
+  assert.ok(demo.sequences.find(entry => entry.name === 'Oyster').sequence.stills.default, 'with a picture');
+  assert.match(chooser()[0].footnote, /^Effects: wobble, hat wobble/);
+
+  await computer.hear('load up Tayne');
+  await computer.hear('show me the sequences');
+  assert.equal(chooser().length, 1, 'only one such window at a time');
+  const names = chooser()[0].projects.find(project => project.id === '4d3d3d3').sequences.map(entry => entry.name);
+  assert.ok(names.includes('Tayne') && !names.includes('BETA'));
+  await computer.hear('list the effects');
+  assert.match([...computer.windows.values()].find(window => window.kind === 'note').text, /^Effects: wobble/);
 });
 
 test('saying no at the gate changes nothing', async () => {
