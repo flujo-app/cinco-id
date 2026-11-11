@@ -15,19 +15,32 @@ function capitalise(name) {
   return name ? name[0].toUpperCase() + name.slice(1) : name;
 }
 
+/** Where the settings file is, or null when settings are switched off (CINCO_ID_CONFIG=none). */
+export function settingsFile(dataDir, env = process.env) {
+  if (env.CINCO_ID_CONFIG === 'none') return null;
+  return env.CINCO_ID_CONFIG ? path.resolve(env.CINCO_ID_CONFIG) : path.join(dataDir, 'harness.config.json');
+}
+
 /**
  * Settings: sensible defaults, then harness.config.json (not in git, machine-specific),
  * then whatever the caller passes in.
+ *
+ * `rootDir` is the app folder (code, helper scripts, the bundled demo project). `dataDir` is
+ * where the settings file, memory, printouts, caches and projects live; it is the app folder
+ * itself unless something else is given (see paths.js).
  */
-export async function loadConfig(rootDir, overrides = {}) {
+export async function loadConfig(rootDir, overrides = {}, { dataDir = null } = {}) {
+  const env = process.env;
+  const data = dataDir ?? (env.CINCO_ID_DATA_DIR ? path.resolve(env.CINCO_ID_DATA_DIR) : rootDir);
   const siblingVoder = path.join(rootDir, '..', 'voder');
   const defaults = {
     port: 19773, // 0x4d3d
     operator: capitalise(path.basename(os.homedir()) || os.userInfo().username),
     defaultProject: '4d3d3d3',
     maxWindows: 96,
-    projectsDir: path.join(rootDir, 'projects'),
-    stateDir: path.join(rootDir, '.local'),
+    projectsDir: path.join(data, 'projects'),
+    stateDir: path.join(data, '.local'),
+    setup: { onFirstStart: true }, // the Setup window opens by itself when there is no settings file yet
     gate: { repeatFirst: true },
     voice: {
       tts: {
@@ -68,13 +81,12 @@ export async function loadConfig(rootDir, overrides = {}) {
     },
     // print: "pdf" sends each printout straight to `printer` through the Windows print system
     // (the PDF printer then asks where to save), "dialog" shows the Windows print window, "off" only saves the picture.
-    printouts: { dir: path.join(rootDir, 'printouts'), print: 'pdf', printer: 'Microsoft Print to PDF' },
+    printouts: { dir: path.join(data, 'printouts'), print: 'pdf', printer: 'Microsoft Print to PDF' },
     media: { python: 'python', script: path.join(rootDir, 'tools', 'media', 'generate.py'), enabled: true },
   };
   // For tests and second copies: CINCO_ID_CONFIG=none ignores the settings file,
   // CINCO_ID_STATE_DIR keeps their memory apart from the real one.
-  const env = process.env;
-  const configFile = env.CINCO_ID_CONFIG === 'none' ? null : env.CINCO_ID_CONFIG || path.join(rootDir, 'harness.config.json');
+  const configFile = settingsFile(data, env);
   let fromFile = {};
   if (configFile) {
     try {
@@ -89,5 +101,16 @@ export async function loadConfig(rootDir, overrides = {}) {
   if (env.CINCO_ID_STATE_DIR) fromEnv.stateDir = env.CINCO_ID_STATE_DIR;
   if (env.CINCO_ID_PROJECTS_DIR) fromEnv.projectsDir = env.CINCO_ID_PROJECTS_DIR;
   if (env.CINCO_ID_PRINTOUTS_DIR) fromEnv.printouts = { dir: env.CINCO_ID_PRINTOUTS_DIR };
-  return merge(merge(merge(defaults, fromFile), fromEnv), overrides);
+  if (/^(1|true|yes|off)$/i.test(env.CINCO_ID_NO_SETUP ?? '')) fromEnv.setup = { onFirstStart: false };
+  const config = merge(merge(merge(defaults, fromFile), fromEnv), overrides);
+  // Where things are is decided here, never by the settings file.
+  return {
+    ...config,
+    appDir: rootDir,
+    dataDir: data,
+    configFile,
+    cacheDir: path.join(data, '.cache'),
+    bundledProjectsDir: path.join(rootDir, 'projects'),
+    fromEnv: Object.keys(fromEnv),
+  };
 }

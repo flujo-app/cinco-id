@@ -1,28 +1,27 @@
 // Starts the real desktop shell (silently), plays the whole routine through the console and
-// checks what ends up on screen. Usage: node test/ui/run.mjs [folder for pictures] [--overlay]
+// checks what ends up on screen. It runs with its own empty data folder, so it also checks that
+// the demo project is copied there on the first start.
+// Usage: node test/ui/run.mjs [folder for pictures] [--overlay] [--exe <packaged CINCO ID.exe>]
 import { _electron as electron } from 'playwright-core';
 import assert from 'node:assert/strict';
 import os from 'node:os';
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { launchOptions, takeOption } from './launch.mjs';
+import { leftSwitchedOff, windows } from './desktop.mjs';
 
-const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const args = process.argv.slice(2);
+const exe = takeOption(args, '--exe');
 const overlay = args.includes('--overlay');
 const shots = args.find(arg => !arg.startsWith('--')) ?? null;
 const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'cinco-id-ui-'));
+const dataDir = path.join(temp, 'data');
+const before = windows();
 
-const app = await electron.launch({
-  args: ['.', '--port=19781', '--silent', '--no-tray', '--no-print', ...(overlay ? ['--overlay'] : [])],
-  cwd: root,
-  env: {
-    ...process.env,
-    CINCO_ID_CONFIG: 'none', CINCO_ID_OPERATOR: 'Paul',
-    CINCO_ID_STATE_DIR: path.join(temp, 'state'),
-    CINCO_ID_PRINTOUTS_DIR: path.join(temp, 'printouts'),
-  },
-});
+const app = await electron.launch(launchOptions({
+  exe, port: 19781, dataDir, args: overlay ? ['--overlay'] : [],
+  env: { CINCO_ID_CONFIG: 'none', CINCO_ID_OPERATOR: 'Paul' },
+}));
 
 const problems = [];
 let step = 0;
@@ -31,6 +30,11 @@ try {
   page.on('pageerror', error => problems.push(`page error: ${error.message}`));
   page.on('console', message => { if (message.type() === 'error') problems.push(`console: ${message.text()}`); });
   await page.waitForSelector('.console-log');
+  if (exe) console.log(`Packaged app: ${exe}`);
+  const copied = await fs.readdir(path.join(dataDir, 'projects')).catch(() => []);
+  assert.ok(copied.includes('4d3d3d3'), 'the demo project was copied into the empty data folder on the first start');
+  console.log(`Example projects copied into the new data folder: ${copied.join(', ')}`);
+  assert.equal(await page.locator('.window.kind-setup').count(), 0, 'the Setup window stays closed with --no-setup');
 
   const count = selector => page.locator(selector).count();
   const lastLine = async () => (await page.locator('.console-log .computer').last().textContent()) ?? '';
@@ -66,7 +70,7 @@ try {
   await say('Give me a printout of Oyster smiling.', 'Printing.', 4200);
   assert.equal(await count('.window.kind-printout'), 1, 'a printout window');
   await page.waitForFunction(() => /^Saved:/.test(document.querySelector('.kind-printout .status-line')?.textContent ?? ''), null, { timeout: 8000 });
-  const printed = await fs.readdir(path.join(temp, 'printouts'));
+  const printed = await fs.readdir(path.join(dataDir, 'printouts'));
   assert.equal(printed.length, 1, 'the printout was saved as a picture');
   await picture('printout');
 
@@ -121,4 +125,7 @@ try {
 } finally {
   await app.close().catch(() => {});
   await fs.rm(temp, { recursive: true, force: true }).catch(() => {});
+  const switchedOff = leftSwitchedOff(before);
+  for (const problem of switchedOff) console.error(`Problem: ${problem}`);
+  if (switchedOff.length) process.exitCode = 1;
 }

@@ -1,14 +1,23 @@
 // The desktop shell: starts the computer and shows its screen, either as a normal window with
 // its own Win95 desktop, or as a see-through layer on top of your real desktop ("overlay").
-import { app, BrowserWindow, Menu, Tray, globalShortcut, ipcMain, nativeImage, screen, session } from 'electron';
+import { app, BrowserWindow, Menu, Tray, globalShortcut, ipcMain, nativeImage, screen, session, shell } from 'electron';
+import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createApp } from '../server/app.js';
+import { resolveDataDir } from '../server/paths.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.join(here, '..', '..');
 const flag = name => process.argv.includes(`--${name}`);
 const option = name => process.argv.find(arg => arg.startsWith(`--${name}=`))?.split('=').slice(1).join('=');
+
+// Started from a clone, settings and projects stay in the project folder as always. The installed
+// app keeps them in the per-user app data folder. A chosen folder (--data-dir= or
+// CINCO_ID_DATA_DIR) also holds the window's own browser data, so a test copy leaves no trace.
+const chosenDataDir = option('data-dir') || process.env.CINCO_ID_DATA_DIR || null;
+if (chosenDataDir) app.setPath('userData', path.resolve(chosenDataDir));
+const dataDir = resolveDataDir({ appDir: rootDir, packaged: app.isPackaged, userData: app.getPath('userData'), option: chosenDataDir });
 
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
@@ -110,11 +119,22 @@ app.whenReady().then(async () => {
   const port = option('port');
   harness = await createApp({
     rootDir,
+    dataDir,
     overrides: port ? { port: Number(port) } : {},
     parts: flag('no-print') ? {} : { printer: printPage },
   });
   await harness.listen();
   for (const note of harness.notes) console.log(`Note: ${note}`);
+
+  // The Start menu on the screen can open the projects and printouts folders. Only these fixed
+  // folders: the screen names one, it never hands over a path.
+  ipcMain.handle('open-folder', async (_event, which) => {
+    const folders = { projects: harness?.config.projectsDir, printouts: harness?.config.printouts.dir, data: harness?.config.dataDir };
+    const folder = folders[which];
+    if (!folder) return 'There is no such folder.';
+    await fs.mkdir(folder, { recursive: true });
+    return (await shell.openPath(folder)) || null;
+  });
 
   // The screen may use the microphone; nothing else gets asked for.
   session.defaultSession.setPermissionRequestHandler((_contents, permission, allow) => allow(permission === 'media'));
