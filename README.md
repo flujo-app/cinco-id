@@ -112,7 +112,8 @@ there and change it by hand. That file stays on your PC and is not put into git.
 puppets, effects and the test call all still work.
 
 - **Your name**: `operator`. The computer addresses you by it.
-- **Voice out**: uses the Voder robot voice if the `voder` project sits next to this folder. Otherwise the
+- **Voice out**: uses the Voder robot voice when it is installed (`pip install git+https://github.com/flujo-app/voder`)
+  or when the `voder` project sits next to this folder. Otherwise the
   voices built into Windows are used. It can also speak with any voice installed in Windows: set
   `"engine": "windows", "voice": "Microsoft Zira Desktop"`, or just say "use the Zira voice". Microsoft Sam is not
   part of Windows 10 or 11. If you install it yourself as a Windows voice, it shows up in the list and can be chosen
@@ -162,6 +163,7 @@ from this PC.
 npm test                                   # fast checks of the logic, the local server and the security rules
 npm run test:ui                            # starts the real app silently and plays the whole routine
 node test/ui/setup-check.mjs               # goes through the Setup window like a first start (no money, no browser)
+node test/ui/sturdy-check.mjs              # busy port, second start, quitting while a dancer is made, a broken settings file
 node test/ui/overlay-check.mjs             # checks the see-through mode on the real desktop (Windows)
 node test/ui/print-check.mjs               # checks that a printout reaches the Windows print system
 node test/ui/clip-check.mjs "Celery Head"  # checks that a generated clip plays see-through

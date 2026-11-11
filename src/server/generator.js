@@ -13,6 +13,13 @@ export class Generator {
     this.script = script;
     this.timeoutMs = timeoutMs;
     this.extraEnv = extraEnv;
+    this.children = new Set();
+  }
+
+  /** Stops every dancer still being made (when the app quits). */
+  stop() {
+    for (const child of this.children) child.kill();
+    this.children.clear();
   }
 
   static create(config, { extraEnv } = {}) {
@@ -27,6 +34,8 @@ export class Generator {
       // Keys travel in the environment only, never on the command line.
       const env = { ...process.env, ...this.extraEnv(), PYTHONUTF8: '1', PYTHONUNBUFFERED: '1' };
       const child = spawn(this.python, args, { env, windowsHide: true });
+      this.children.add(child);
+      child.on('exit', () => this.children.delete(child));
       let finished = null;
       let problem = '';
       const timer = setTimeout(() => { problem = 'it took too long'; child.kill(); }, this.timeoutMs);

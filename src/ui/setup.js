@@ -209,14 +209,22 @@ export function buildSetup(record, context) {
         list.append(el('div', 'setup-hint', 'Looking for voices...'));
       } else {
         const options = [];
-        if (status.voder.available) options.push(['voder', 'Robot voice (the voder project next door)']);
+        if (status.voder.available) options.push(['voder', 'Robot voice']);
         for (const one of status.voices.filter(v => v.engine === 'windows')) {
           options.push([`windows:${one.name}`, `${one.name}${one.language ? `  (${one.language})` : ''}`]);
         }
         options.push(['browser', 'The screen\'s own voice']);
         if (!options.some(([value]) => value === draft.voice)) draft.voice = options[0][0];
         for (const [value, label] of options) radio(list, 'voice', value, label, draft.voice === value, picked => { draft.voice = picked; });
-        if (!status.voder.available) box.append(el('div', 'setup-hint', 'The robot voice appears here when the voder project sits next to this app\'s folder.'));
+        if (!status.voder.available) {
+          box.append(el('div', 'setup-hint', 'The robot voice is not installed yet. Install it once with this command, then restart CINCO ID:'));
+          const command = el('input', 'setup-input setup-command');
+          command.readOnly = true;
+          command.value = status.voder.install;
+          command.name = 'voderInstall';
+          command.addEventListener('focus', () => command.select());
+          box.append(command);
+        }
       }
       const row = el('div', 'setup-row');
       page.append(row);

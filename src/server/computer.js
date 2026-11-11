@@ -44,6 +44,8 @@ export const DEFAULT_PHRASES = {
   voiceChanged: 'This is my voice now, {operator}.',
   setupOpen: 'Setup.',
   settingsSaved: 'Settings saved, {operator}.',
+  quitWhileGenerating: 'A new sequence is still being generated. If you quit now it will be lost. Quit anyway?',
+  restartWhileGenerating: 'A new sequence is still being generated. If you restart now it will be lost. Restart anyway?',
 };
 
 const PENDING_MS = 90_000;
@@ -306,7 +308,30 @@ export class Computer extends EventEmitter {
   async dialogAnswer(dialogId, button) {
     if (this.pending?.dialogId !== dialogId) return;
     this.heard(button, 'click');
-    return this.answer(/^(yes|ok)$/i.test(button));
+    return this.answer(/^(yes|ok|quit|restart)$/i.test(button));
+  }
+
+  /**
+   * Before the app quits or restarts: if a new dancer is still being made, asks first, because
+   * it would be lost. Resolves to true (go ahead) or false (keep running). Silence counts as no.
+   */
+  askToQuit({ restart = false } = {}) {
+    if (!this.jobs.size) return Promise.resolve(true);
+    if (this.quitQuestion) return this.quitQuestion;
+    const go = restart ? 'Restart' : 'Quit';
+    this.quitQuestion = new Promise(resolve => {
+      const dialogId = `d${this.nextWindow}`;
+      this.openWindow({
+        kind: 'dialog', dialogId, title: restart ? 'Restart CINCO ID?' : 'Quit CINCO ID?', icon: 'warning',
+        text: this.fill(this.phrases[restart ? 'restartWhileGenerating' : 'quitWhileGenerating']), buttons: [go, 'Keep running'],
+      });
+      this.ask('quit', { dialogId, resolve });
+      this.send({ type: 'sound', name: 'chord' });
+      this.say(restart ? 'restartWhileGenerating' : 'quitWhileGenerating');
+      const timer = setTimeout(() => { if (this.pending?.dialogId === dialogId) this.clearPending(); }, PENDING_MS);
+      timer.unref?.();
+    }).finally(() => { this.quitQuestion = null; });
+    return this.quitQuestion;
   }
 
   /**
@@ -640,6 +665,7 @@ export class Computer extends EventEmitter {
     this.generator.run({ name, prompt, out: place.dir }, update => {
       this.send({ type: 'progress', jobId, value: update.progress ?? null, text: update.message ?? update.stage ?? '' });
     }).then(async () => {
+      await this.library.finishSequence(place.dir);
       await this.library.reload();
       this.say('newBeta');
     }).catch(async error => {
@@ -670,7 +696,23 @@ export class Computer extends EventEmitter {
     });
     this.calls.set(call.callId, { ...call, caller, windowId: window.id });
     this.send({ type: 'sound', name: 'ring' });
+    // Make sure the Decline button tells the truth: is the connector really there right now?
+    if (!call.test && this.connectors?.checkDecline) {
+      this.connectors.checkDecline().catch(() => false).then(() => this.declineAvailabilityChanged());
+    }
     return this.say(call.isVideo ? 'videoCalling' : 'calling', { caller });
+  }
+
+  /** The connector that declines calls came or went: the call windows follow. */
+  declineAvailabilityChanged() {
+    const can = Boolean(this.connectors?.canDeclineCalls?.());
+    const changed = [];
+    for (const window of this.windows.values()) {
+      if (window.kind !== 'call' || window.call.test || window.canDecline === can) continue;
+      window.canDecline = can;
+      changed.push({ id: window.id, canDecline: can });
+    }
+    if (changed.length) this.send({ type: 'call.decline-state', windows: changed });
   }
 
   callEnded({ callId, reason = 'ended' }) {

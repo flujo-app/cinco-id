@@ -25,6 +25,30 @@ function toSpeechWav(ffmpeg, from, to) {
   });
 }
 
+/** The one command that installs the robot voice as a normal Python package. */
+export const VODER_INSTALL = 'pip install git+https://github.com/flujo-app/voder';
+
+const voderChecks = new Map();
+/**
+ * Whether this Python can import the robot voice as an installed package (pip install
+ * git+https://github.com/flujo-app/voder). Only looks it up, does not load it. Remembered per Python.
+ */
+export function voderPackage(python = 'python', { run = null } = {}) {
+  if (!voderChecks.has(python)) {
+    voderChecks.set(python, new Promise(resolve => {
+      const check = run ?? ((command, args) => new Promise(done => {
+        const child = spawn(command, args, { windowsHide: true, stdio: 'ignore' });
+        const timer = setTimeout(() => { child.kill(); done(1); }, 15_000);
+        child.on('error', () => { clearTimeout(timer); done(1); });
+        child.on('exit', code => { clearTimeout(timer); done(code); });
+      }));
+      Promise.resolve(check(python, ['-c', 'import importlib.util, sys; sys.exit(0 if importlib.util.find_spec("voder.engine") else 3)']))
+        .then(code => resolve(code === 0), () => resolve(false));
+    }));
+  }
+  return voderChecks.get(python);
+}
+
 function windowsWorker() {
   return new LineWorker({
     name: 'The Windows voice',
@@ -47,11 +71,19 @@ export class Speaker {
     this.voice = config.voice ?? null; // name of the Windows voice, when that engine is used
     this.worker = null;
     this.inFlight = new Map();
+    this.voderInstalled = false;
   }
 
   get serverSide() { return this.engine === 'voder' || this.engine === 'windows'; }
 
-  get voderAvailable() { return existsSync(path.join(this.config.voderPath ?? '', 'voder', 'engine.py')); }
+  /** The robot voice: installed as a Python package, or the voder folder next to this app's folder. */
+  get voderAvailable() { return this.voderInstalled === true || existsSync(path.join(this.config.voderPath ?? '', 'voder', 'engine.py')); }
+
+  /** Looks once whether the configured Python has the robot voice installed as a package. */
+  async detect({ run = null } = {}) {
+    this.voderInstalled = await voderPackage(this.config.python ?? 'python', { run });
+    return this.voderAvailable;
+  }
 
   /** Every voice that can be used on this PC: the robot voice plus what Windows has installed. */
   async list() {

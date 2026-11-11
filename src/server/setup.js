@@ -5,6 +5,7 @@ import path from 'node:path';
 import readline from 'node:readline';
 import { checkPython } from './settings.js';
 import { findSecret } from './secrets.js';
+import { VODER_INSTALL } from './voice/voice.js';
 
 /**
  * What the Setup window needs to know about this PC, and the two fixed programs it may start
@@ -126,7 +127,10 @@ export async function setupStatus(config, { secrets, probe = {} } = {}) {
   const openrouter = findSecret('openrouter', { secrets, env, config });
   return {
     voices: voices.map(voice => ({ engine: voice.engine, name: voice.name, language: voice.language ?? null })),
-    voder: { available: voices.some(voice => voice.engine === 'voder') || Boolean(probe.voderAvailable) },
+    voder: {
+      available: voices.some(voice => voice.engine === 'voder') || Boolean(probe.voderAvailable),
+      install: `${config.voice?.tts?.python && config.voice.tts.python !== 'python' ? `"${config.voice.tts.python}" -m ` : ''}${VODER_INSTALL}`,
+    },
     ears: earsResult ? { configured: true, ...earsResult } : { configured: false },
     claude: { found: Boolean(claude) },
     modal: {
