@@ -9,7 +9,7 @@
       "expressions": [
         "smiling"
       ],
-      "prompt": "Celery Man: an ordinary, slightly awkward office worker in his thirties with short neat hair, wearing a baggy grey early-1990s suit with big shoulders, a white shirt, a celery-green tie and sensible brown shoes. Dance: an earnest side-to-side office-party shuffle, stepping left and right with stiff arms and a shy, concentrated face"
+      "prompt": "Celery Man: a slim, clean-shaven man around forty with short dark-brown hair and a confident, slightly smug face, wearing an oversized shiny silver-grey sharkskin suit with a 1980s cut: wide padded shoulders, the jacket worn open, baggy pleated trousers. Under it a plain white dress shirt with a thin, loosened dark-grey tie, a black belt with a silver buckle, and black dress shoes. Dance: cheesy, self-satisfied showman moves to the beat: he pops one hip out, bounces on his knees, pumps both fists up and down by his shoulders and shimmies his shoulders, grinning smugly the whole time"
     },
     {
       "id": "oyster",
@@ -18,7 +18,7 @@
       "expressions": [
         "smiling"
       ],
-      "prompt": "Oyster: a cheerful person in their late twenties wearing a shiny pearl-grey satin shirt, dark slacks, black shoes and a pearl necklace. Dance: a smooth, happy groove, swaying the hips and shoulders and snapping the fingers"
+      "prompt": "Oyster: a slim, clean-shaven man around forty with short dark-brown hair, wearing a snug red knit skull cap whose top is dark navy blue with a red flame pattern, an open red zip-up track jacket with white stripes down the sleeves over a plain black T-shirt, a black studded choker necklace, black trousers and black shoes. Dance: goofy bent-forward bouncing and head-banging, then popping back up straight"
     },
     {
       "id": "tayne",
@@ -27,16 +27,16 @@
       "expressions": [
         "smiling"
       ],
-      "prompt": "Tayne: a flamboyant stage entertainer in his forties wearing a sparkly teal sequinned jumpsuit, white boots and a very large wide-brimmed dark navy hat sitting clearly on top of his head. Dance: a confident strut on the spot, swinging the hips and rolling the shoulders"
+      "prompt": "Tayne: a slim, clean-shaven man around forty with short dark-brown hair, wearing a black hat with a low flat-topped crown and a wide, stiff, flat brim sitting clearly on top of his head, black wrap-around sunglasses, a thin gold chain necklace, a loud long-sleeved silk shirt with a baroque scroll print in orange-gold and black, tucked into shiny black leather trousers, and black leather boots. Dance: a wide-legged squat groove with both arms flexed up beside the head, then a confident strut on the spot and a little kick"
     },
     {
       "id": "tayne/nude",
       "name": "Tayne (beach costume)",
-      "seed": 9002,
+      "seed": 9003,
       "expressions": [],
-      "prompt": "Tayne in his silly beach costume: the same flamboyant entertainer in his forties, clean-shaven, now wearing a bright lime-green sling-style one-piece comedy swimsuit with two wide straps over the shoulders, and a big puffy yellow inflatable rubber-duck swim ring worn around his hips that completely hides everything from the belly button down to the upper thighs, together with the same white boots and the same very large wide-brimmed dark navy hat sitting on top of his head. A goofy, non-sexual beach gag costume. Dance: a confident strut on the spot, swinging the hips and rolling the shoulders",
+      "prompt": "Tayne in his silly beach costume: the same slim, clean-shaven man around forty, now wearing a bright lime-green sling-style one-piece comedy swimsuit with two wide straps over the shoulders, and two big puffy yellow inflatable swim rings stacked around his waist and hips, the top one with a rubber-duck head: the two thick tubes completely hide the bottom of the swimsuit and everything from the belly button down to the upper thighs, together with the same black flat-brimmed hat sitting on top of his head, the same black wrap-around sunglasses, the thin gold chain and the black leather boots. A goofy, non-sexual beach gag costume. Dance: a wide-legged groove with both arms flexed up beside the head, then a confident strut on the spot",
       "like": "tayne",
-      "likeStrength": 0.75,
+      "likeStrength": 0.85,
       "likeTint": "#e2b48f"
     }
   ]
