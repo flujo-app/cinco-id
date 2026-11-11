@@ -12,7 +12,7 @@ export const DEFAULT_PHRASES = {
   yes: 'Yes, {operator}.',
   ok: 'Yes.',
   added: 'Sequence added.',
-  engaged: '{thing} engaged.',
+  engaged: '{thing} Engaged.',
   printing: 'Printing.',
   betaOffer: 'I have a BETA sequence I have been working on. Would you like to see it?',
   noBeta: 'No new sequences, {operator}.',

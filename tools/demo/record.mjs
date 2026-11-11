@@ -1,6 +1,6 @@
-// Records the demo video: the first-run Setup window, the 4d3d3d3 routine and the dancer in
-// d15c0, with the app's own sound (voice, effects, music). THIS IS AUDIBLE and takes about
-// three minutes. Nothing else on the PC is recorded: the picture is the app's own window
+// Records the demo video: the first-run Setup window, the start window, the 4d3d3d3 routine, the
+// dancer in d15c0, choosing a sequence by its picture and an incoming call, with the app's own
+// sound (voice, effects, music). THIS IS AUDIBLE and takes about three minutes. Nothing else on the PC is recorded: the picture is the app's own window
 // content, the sound is the app's own sound.
 //
 //   node tools/demo/record.mjs [output.mp4] [--voice robot|zira|<part of a Windows voice name>] [--keep-frames]
@@ -138,7 +138,15 @@ try {
   await say('Mooooore discooooo!', { after: 5000 });
   await say('rainbow', { after: 4000 });
 
-  // ---- 4. A call comes in ----
+  // ---- 4. Choosing a sequence by its picture ----
+  await say('clear the desktop', { after: 900 });
+  await say('choose a sequence', { after: 2800 });
+  await page.locator('.kind-chooser .chooser-tile', { hasText: 'Celery Man' }).click();
+  await page.waitForFunction(count => window.betaSequence.voiceLog().length > count, saidSoFar, { timeout: 30000 }).catch(() => {});
+  saidSoFar = await page.evaluate(() => window.betaSequence.voiceLog().length);
+  await pause(3500);
+
+  // ---- 5. A call comes in ----
   await say('test call from my wife', { after: 1800 });
   await page.locator('.kind-call button', { hasText: 'Accept' }).click();
   await page.waitForFunction(count => window.betaSequence.voiceLog().length > count, saidSoFar, { timeout: 30000 }).catch(() => {});

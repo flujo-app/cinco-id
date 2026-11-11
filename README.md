@@ -1,8 +1,9 @@
 # CINCO ID
 
-**Cinco Identity Generator 2.5.** A talking computer with a Windows 95 screen. You tell it what to load, it opens far
-too many windows of dancing figures, answers in a deadpan robot voice, and can do real work, because behind the
-screen sits a real AI assistant.
+**Cinco Identity Generator 2.5.** A talking computer with the screen from the sketch: a light blue desktop, grey
+windows with white title bars, and white words typed out on black. You tell it what to load, it opens far too many
+windows of dancing figures, answers in a deadpan robot voice, and can do real work, because behind the screen sits a
+real AI assistant.
 
 It is an unofficial fan tribute to a certain sketch about a man, his office computer and some dancing sequences, and
 is not connected to the people who made that sketch. Say the same lines and you get a similar evening. Say anything
@@ -10,7 +11,7 @@ else and it still does something sensible.
 
 The dancers are invented people. Their pictures and dance clips are machine-made (AI-generated).
 
-[![The Win95 desktop full of dancing sequences. Click to watch the demo with sound.](docs/screenshot.png)](docs/demo.mp4)
+[![The desktop full of dancing sequences. Click to watch the demo with sound.](docs/screenshot.png)](docs/demo.mp4)
 
 **[Watch the demo with sound](docs/demo.mp4)**: the first-start Setup window, the 4d3d3d3 routine, a dancer that was
 made from one sentence, and an incoming call. In that video the computer speaks with a voice built into Windows.
@@ -29,17 +30,22 @@ There is also [the same demo with the robot voice](docs/demo-robot-voice.mp4).
 - **A voice from 1939.** The computer speaks with [Voder](https://github.com/flujo-app/voder), a small speech
   synthesizer modelled on Homer Dudley's Voder: buzz and hiss shaped by resonant filters. It can use any voice
   installed in Windows instead. It listens with Whisper, running on your own PC.
-- **WhatsApp calls.** When someone calls you on WhatsApp, a window shows who it is and the phone rings. You can
-  decline. Ask it to accept and it says "I'm afraid I can't do that."
-- **Printouts.** "Give me a printout of Oyster smiling" is a real Windows print job, sent to the PDF printer.
-- **Far too many windows.** A Win95 desktop with a taskbar, a Start menu and up to 96 windows at once, about twenty
+- **WhatsApp calls.** When someone calls you on WhatsApp, the screen goes pale and an "INCOMING CALL" window shows
+  the number on a red display and the caller's name under a ringing phone. You can decline. Ask it to accept and it
+  says "I'm afraid I can't do that."
+- **Printouts.** "Give me a printout of Oyster smiling" is a real Windows print job, sent to the PDF printer: a
+  photo with a small caption, as in the sketch.
+- **Real disco.** Three disco loops play while anything dances. "More disco" steps up to the next one, twice. They
+  were made with an open music model, and you can make your own.
+- **Far too many windows.** Up to 96 at once, in the look of the sketch's computer: whole dancers on white,
+  close-ups on pink that follow the head, title cards in big chunky letters, neat piles of windows, about twenty
   effects, and any made-up word becomes its own effect and is remembered. In see-through mode the windows and
   dancers sit on top of your real desktop.
 - **Open to other AI agents.** FLUJO, Claude Code, Codex or a swarm can operate the screen through a local door.
 
 ## Install
 
-Download `CINCO-ID-Setup-2.5.2.exe` from the [releases page](https://github.com/flujo-app/cinco-id/releases) and run
+Download `CINCO-ID-Setup-2.5.3.exe` from the [releases page](https://github.com/flujo-app/cinco-id/releases) and run
 it. It installs for your Windows user only and does not need administrator rights. You get a Start menu entry and a
 desktop shortcut; "CINCO ID" in Windows' "Apps" list removes it again (your settings and projects stay in your app
 data folder).
@@ -56,7 +62,7 @@ So far it has only been run on Windows 10.
 
 ```powershell
 npm install
-npm start          # its own window with a Win95 desktop
+npm start          # its own window with the light blue desktop
 npm run overlay    # see-through: the windows and dancers sit on top of your real desktop
 ```
 
@@ -71,24 +77,29 @@ Keys that work everywhere while it runs:
 | Ctrl+Alt+O | switch between its own window and the see-through mode |
 | Ctrl+Alt+Q | quit |
 
-In the window you can also hold the space bar to talk, or type into the "Computer" console.
+In the window you can also hold the space bar to talk, or type into the computer's own window (the one with your
+name on it, bottom left). The **Menu** button at the bottom right has the rest: choose a sequence, music, a test
+call, your folders and Setup.
 
 ## Things to say
 
 | Say | It does |
 |---|---|
-| "Computer, load up Celery Man please." | opens that sequence in a window |
+| "Computer, load up Celery Man please." | opens that sequence: the whole dancer in one window, a close-up beside it |
 | "Could you kick up the 4d3d3d3?" | starts project 4d3d3d3: the screen fills with copies |
-| "Add sequence: Oyster." | adds another dancer |
+| "Add sequence: Oyster." | adds another dancer, in the wide window |
 | "Give me a printout of Oyster smiling." | makes a printout and sends it to the PDF printer |
-| "Do we have any new sequences?" | offers a held-back "beta sequence"; say "alright" to see it |
-| "Can I get a hat wobble?" | wobbles everything above the hat line |
-| "And a Flarhgunnstow?" | any made-up word becomes its own effect, and is remembered |
+| "Do we have any new sequences?" | offers a held-back "beta sequence"; say "alright" and it loads behind a "please wait" bar |
+| "Can I get a hat wobble?" | wobbles everything above the hat line, in a neat pile of windows |
+| "And a Flarhgunnstow?" | the dancer steps out of the window, with three close-ups beside it |
+| "And a Blorptangle?" | any made-up word becomes its own effect, and is remembered |
 | "Nude Tayne." | asks you to repeat, then "This is not suitable for work. Are you sure?" |
 | "Free" | takes the dancers out of their windows (best in see-through mode) |
 | "Rainbow on Oyster", "tumble", "trails", "conga" ... | more effects; "normal" removes them |
 | "Close Oyster", "clear the desktop" | tidies up |
-| "More disco", "music off", "quiet" | starts or stops the disco music, or stops the voice |
+| "Disco", "more disco", "mooooore discooooo" | starts the disco music, then steps it up twice |
+| "Stop the disco", "quiet" | stops the music, or stops the voice |
+| "Choose a sequence" | shows a picture of every dancer; click one to load it |
 | "What voices do you have?", "use the Zira voice", "talk like the robot" | lists and switches the computer's voice |
 | "Test call from my wife", then "answer the call" or "decline" | shows what an incoming call looks like |
 | "New project", "kick up the beef" | makes a new, empty project with a hex name |
@@ -97,7 +108,7 @@ In the window you can also hold the space bar to talk, or type into the "Compute
 | "Link WhatsApp" | opens the Setup window on its WhatsApp page |
 | anything else | goes to the brain, if one is connected |
 
-"List everything" shows all projects, sequences, effects and learned words.
+"List the effects" shows all effects and learned words.
 
 ## The demo project, and making your own
 
@@ -120,6 +131,12 @@ computer starts an empty one. Then describe a dancer in one sentence, as above. 
 the name. The computer works on it in the background, tells you when it has a new beta sequence, and shows it when
 you ask "do we have any new sequences?". Until a dancer has a generated clip, a simple drawn puppet stands in, so
 everything also works offline.
+
+**The disco music** is three loops in `src/ui/music/`, made with the open music model ACE-Step 1.5 from a
+description of the style alone (no song, band or artist named). To make your own, change the descriptions in
+`tools/media/music.json` and run `python tools/media/make_music.py`: it shows the cost first (about 10 cents) and
+spends nothing until you add `--yes`. If the loops are missing, a small band made on the spot plays instead.
+[docs/MEDIA.md](docs/MEDIA.md) has the details.
 
 ## Linking your accounts
 
@@ -151,13 +168,15 @@ Running CINCO ID itself costs nothing. The parts that can cost money are your ow
 | One new dancer on Modal with the Wan2.2 model | about $0.80 | longer |
 | One new dancer through OpenRouter | about $0.25 (MiniMax) or $0.53 (Seedance) for a 5-second clip at 480p, from the price list, plus a few cents on Modal | not measured |
 | Preparing a Modal account once | about $0.25 for all three models (about 240 GB, 40 minutes), or about $0.05 for the default dance model alone (80 GB, 10 minutes, estimated) | once |
+| Your own disco loops on Modal (optional; the three that ship cost nothing) | about $0.10 for a full set of three | about 10 minutes |
 
 **Between dancers nothing keeps running**, so there is no hourly cost. The only standing cost is storage for the
 model files on Modal:
 
 - Modal charges $0.09 per GiB per month, and the first 1 TiB per month in a workspace is free
   ([Modal pricing](https://modal.com/pricing), read in November 2026).
-- The picture models take 31 GiB, Wan2.2 takes 118 GiB and your own copy of LTX-2.5 takes 75 GiB.
+- The picture models take 31 GiB, Wan2.2 takes 118 GiB and your own copy of LTX-2.5 takes 75 GiB. The music
+  model, only there if you make your own disco loops, takes 10 GiB.
 - So storage is free while your whole Modal workspace stays under 1 TiB. Above that, all three together would cost
   about $20 a month.
 
@@ -167,6 +186,7 @@ model files on Modal:
 modal volume delete beta-sequence-art-weights
 modal volume delete beta-sequence-wan-weights
 modal volume delete beta-sequence-ltx-weights
+modal volume delete beta-sequence-music-weights
 ```
 
 The drawback is waiting at the next new dancer while the files are fetched again: about 5 minutes and 1 cent for the
@@ -179,7 +199,7 @@ project's first name, Beta Sequence.
 The first time it starts, a Setup window opens by itself. It asks what the computer should call you, which voice
 it uses (with a "Say something" button to hear it), whether it should listen to you, which brain it uses, and
 whether you want to make new dancers on your own Modal account. Press Next to skip anything you do not need.
-Open it again any time from the Start menu ("Setup..."), or by saying or typing "setup" or "settings".
+Open it again any time from the Menu button ("Setup..."), or by saying or typing "setup" or "settings".
 
 - Keys you type into it (for a brain service or for OpenRouter) are kept encrypted with your Windows sign-in, in
   the data folder. They are never shown again, never written into the settings file and never put on a command
@@ -196,7 +216,7 @@ Open it again any time from the Start menu ("Setup..."), or by saying or typing 
 | From this folder (`npm start`, `npm run serve`) | this folder |
 | With `CINCO_ID_DATA_DIR` set (or `--data-dir=`) | that folder |
 
-The Start menu on the screen has "Projects folder" and "Printouts folder" to open them.
+The Menu button on the screen has "Projects folder" and "Printouts folder" to open them.
 
 WhatsApp keeps its own things in a `whatsapp` folder inside the data folder: the sign-in (`whatsapp\session`), the
 WhatsApp connector's log (`whatsapp\logs`) and the copy of the connector that Install fetched (`whatsapp\connector`).
@@ -272,6 +292,7 @@ npm run test:ui                            # starts the real app silently and pl
 node test/ui/setup-check.mjs               # goes through the Setup window like a first start (no money, no browser)
 node test/ui/sturdy-check.mjs              # busy port, second start, quitting while a dancer is made, a broken settings file
 node test/ui/whatsapp-check.mjs            # links WhatsApp with a stand-in connector: Install, QR code, a call, Decline, Unlink
+node test/ui/music-check.mjs               # the three disco loops load, loop and step up (silent)
 node test/ui/overlay-check.mjs             # checks the see-through mode on the real desktop (Windows)
 node test/ui/print-check.mjs               # checks that a printout reaches the Windows print system
 node test/ui/clip-check.mjs "Celery Head"  # checks that a generated clip plays see-through
