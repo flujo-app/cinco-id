@@ -134,7 +134,7 @@ test('the screen connection gets the current picture and live updates', async ()
     });
     assert.equal(messages[0].type, 'snapshot');
     assert.equal(messages[0].windows.length, 1);
-    assert.deepEqual(messages[0].projects.map(project => project.id), ['4d3d3d3']);
+    assert.deepEqual(messages[0].projects.map(project => project.id), ['4d3d3d3', 'd15c0']);
     socket.send(JSON.stringify({ type: 'command', text: 'wobble' }));
     await new Promise(resolve => setTimeout(resolve, 150));
     assert.ok(messages.some(message => message.type === 'effects.set'));

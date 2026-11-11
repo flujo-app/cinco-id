@@ -48,6 +48,19 @@ function anywhereMatch(words, find) {
   return null;
 }
 
+/** A short name for a new sequence from its description: "a grandmother in a gold tracksuit ..." -> "grandmother". */
+export function nameFromDescription(description) {
+  const stop = new Set(['in', 'with', 'doing', 'dancing', 'wearing', 'who', 'that', 'on', 'at', 'of', 'and', 'while', 'holding', 'dressed', 'from', 'is', 'as']);
+  const words = normalize(description).split(' ').filter(Boolean);
+  while (words.length > 1 && ['a', 'an', 'the', 'some', 'one', 'my', 'our'].includes(words[0])) words.shift();
+  const taken = [];
+  for (const word of words) {
+    if (stop.has(word) || taken.length === 3) break;
+    taken.push(word);
+  }
+  return (taken.length ? taken : words.slice(0, 3)).join(' ');
+}
+
 export function isYes(text) { return YES.test(clean(text)); }
 export function isNo(text) { return NO.test(clean(text)); }
 
@@ -59,6 +72,8 @@ export function parseCommand(text, world) {
   // Calls
   if (/^(?:decline|reject|hang up|ignore)(?: (?:the|that|this) call| it| them)?$/.test(said)) return { intent: 'call.decline' };
   if (/^who (?:is|s) (?:calling|it|that|on the phone)$/.test(said)) return { intent: 'call.who' };
+  if (/^(?:answer|accept|pick up)(?: (?:the|that|this) (?:call|phone)| it| the phone)?$/.test(said)
+    || /^(?:take|get) (?:the|that|this) (?:call|phone)$/.test(said)) return { intent: 'call.accept' };
   if ((m = said.match(/^(?:simulate|test|fake|pretend) (?:a |an )?(?:incoming )?(video )?call(?: from (.+))?$/))) {
     return { intent: 'call.test', video: Boolean(m[1]), name: m[2] ?? null };
   }
@@ -112,7 +127,16 @@ export function parseCommand(text, world) {
 
   // Making new things
   if ((m = asked.match(/^(?:generate|make|create|build|render|draw|work on) (?:me |us )?(?:a |an )?(?:new |beta |brand new )?sequence(?: (?:of|called|named|with|for|about|showing))? (.+)$/))) {
-    return { intent: 'generate', prompt: m[1] };
+    // "... sequence called Disco Grandma of a grandmother ..." or "... of a grandmother ... called Disco Grandma"
+    let prompt = m[1];
+    let name = null;
+    let named;
+    if (/ sequence (?:called|named) /.test(asked) && (named = prompt.match(/^(.+?) (?:of|with|showing|about|who is|that is) (.+)$/))) {
+      [, name, prompt] = named;
+    } else if ((named = prompt.match(/^(.+) (?:called|named) (.+)$/))) {
+      [, prompt, name] = named;
+    }
+    return { intent: 'generate', prompt, name: name ?? nameFromDescription(prompt) };
   }
   if ((m = asked.match(/^(?:new|create|make|start) (?:a |an )?(?:new |empty )?project(?: (?:called|named))?(?: (.+))?$/))) {
     return { intent: 'project.create', name: m[1] ?? null };

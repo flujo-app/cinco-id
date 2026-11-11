@@ -247,6 +247,7 @@ export async function createApp({ rootDir, overrides = {}, env = process.env, pa
         else if (message.type === 'window.closed') computer.windowClosed(message.id);
         else if (message.type === 'dialog.answer') await computer.dialogAnswer(message.dialogId, message.button);
         else if (message.type === 'call.decline') await computer.declineCall(message.callId);
+        else if (message.type === 'call.accept') computer.acceptCall();
       } catch (error) {
         broadcast({ type: 'note', level: 'error', text: error.message });
       }

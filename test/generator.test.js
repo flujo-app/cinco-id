@@ -70,13 +70,13 @@ test('asking for a new sequence makes it in the background and offers it as a be
     assert.equal(said().at(-1), 'Paul, I have a new BETA sequence.');
     assert.ok(actions.some(action => action.type === 'progress' && action.text === 'Teaching the dance'));
     assert.ok(![...computer.windows.values()].some(window => window.kind === 'progress'), 'the progress window closes');
-    const made = library.allSequences().find(sequence => sequence.name === 'A Grandmother In');
+    const made = library.allSequences().find(sequence => sequence.name === 'Grandmother');
     assert.ok(made?.beta, 'the new sequence exists and is held back');
 
     await computer.hear('do we have any new sequences?');
     assert.equal(said().at(-1), 'I have a BETA sequence I have been working on. Would you like to see it?');
     await computer.hear('alright');
-    assert.equal(said().at(-1), 'A Grandmother In.');
+    assert.equal(said().at(-1), 'Grandmother.');
 
     // A failed attempt leaves nothing behind.
     process.env.FAKE_MODE = 'fail';

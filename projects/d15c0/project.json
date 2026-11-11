@@ -1,0 +1,5 @@
+{
+  "name": "Disco",
+  "description": "Made live by typing one sentence: generate a new sequence of a grandmother in a gold tracksuit doing disco moves.",
+  "show": { "windows": 20, "effects": ["tumble"], "drift": true }
+}

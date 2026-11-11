@@ -56,7 +56,8 @@ In the window you can also hold the space bar to talk, or type into the "Compute
 ## Projects and sequences
 
 Everything it can load lives in `projects/`. Each project is a folder with a hexadecimal name, and each dancer
-("sequence") is a folder inside it. `projects/4d3d3d3` is the demo project. See [docs/PROJECTS.md](docs/PROJECTS.md).
+("sequence") is a folder inside it. `projects/4d3d3d3` is the demo project, and `projects/d15c0` holds one dancer that was
+made live by typing a single sentence. See [docs/PROJECTS.md](docs/PROJECTS.md).
 
 Every sequence has a simple drawn puppet, so it always works, even offline. When a generated video clip exists for
 a sequence, the clip is used instead. The demo cast ships ready-made as generated clips of invented people, so no
