@@ -33,7 +33,7 @@ In the window you can also hold the space bar to talk, or type into the "Compute
 | "Computer, load up Celery Man please." | opens that sequence in a window |
 | "Could you kick up the 4d3d3d3?" | starts project 4d3d3d3: the screen fills with copies |
 | "Add sequence: Oyster." | adds another dancer |
-| "Give me a printout of Oyster smiling." | makes a printout picture and saves it in `printouts/` |
+| "Give me a printout of Oyster smiling." | makes a printout and sends it to the PDF printer |
 | "Do we have any new sequences?" | offers a held-back "beta sequence"; say "alright" to see it |
 | "Can I get a hat wobble?" | wobbles everything above the hat line |
 | "And a Flarhgunnstow?" | any made-up word becomes its own effect, and is remembered |
@@ -71,7 +71,7 @@ and is not put into git. Without it, the fixed phrases, puppets, effects and the
   with a `baseUrl`, `model` and the name of the environment variable that holds the key.
 - **Outside tools**: list MCP servers under `mcpServers`. The brain may use them. Any tool that is not marked
   read-only by its server asks you "Shall I?" in a dialog box first, every time.
-- **Printing on paper**: `"printouts": { "printer": true }` sends each printout to the default printer. Off by default.
+- **Printing**: every printout is saved as a picture in `printouts/` and also sent through the Windows print system to the PDF printer, which asks where to save the file. `"printouts": { "print": "dialog" }` shows the normal Windows print window instead, `"print": "off"` only saves the picture, and `"printer": "<name>"` picks another printer.
 
 ## Incoming WhatsApp calls
 
@@ -110,4 +110,6 @@ from this PC.
 npm test                                   # fast checks of the logic, the local server and the security rules
 npm run test:ui                            # starts the real app silently and plays the whole routine
 node test/ui/overlay-check.mjs             # checks the see-through mode on the real desktop (Windows)
+node test/ui/print-check.mjs               # checks that a printout reaches the Windows print system
+node test/ui/clip-check.mjs "Celery Head"  # checks that a generated clip plays see-through
 ```

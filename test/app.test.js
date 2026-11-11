@@ -160,6 +160,32 @@ test('printouts are saved as pictures and nothing else is accepted', async () =>
   } finally { await stop(); }
 });
 
+test('printouts are handed to the Windows printer when printing is on, and not when it is off', async () => {
+  const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  const post = base => fetch(`${base}/api/printouts`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ caption: 'Oyster, smiling', dataUrl: `data:image/png;base64,${png}` }) });
+  const jobs = [];
+  const printer = async job => { jobs.push(job); return { success: true, printer: job.settings.printer }; };
+
+  const on = await start({ parts: { printer } });
+  try {
+    const result = await (await post(on.base)).json();
+    assert.equal(result.printing, 'Microsoft Print to PDF');
+    assert.equal(jobs.length, 1);
+    assert.equal(jobs[0].settings.print, 'pdf');
+    const sheet = await fetch(jobs[0].url);
+    assert.equal(sheet.status, 200);
+    assert.match(await sheet.text(), /<img src="\/printouts\/[\w.-]+oyster-smiling\.png"/);
+    assert.equal((await fetch(`${on.base}/print/..%2Fsecret.png`)).status, 404);
+  } finally { await on.stop(); }
+
+  const off = await start({ parts: { printer }, overrides: { printouts: { print: 'off' } } });
+  try {
+    const result = await (await post(off.base)).json();
+    assert.equal(result.printing, null);
+    assert.equal(jobs.length, 1, 'nothing more was printed');
+  } finally { await off.stop(); }
+});
+
 test('outside agents can operate the screen through the local door, with the right key only', async () => {
   const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
   const { StreamableHTTPClientTransport } = await import('@modelcontextprotocol/sdk/client/streamableHttp.js');

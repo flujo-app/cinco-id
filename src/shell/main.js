@@ -76,9 +76,35 @@ function buildTray() {
   ]));
 }
 
+/**
+ * Sends one printout through the Windows print system. By default it goes straight to the
+ * PDF printer (Windows then asks where to save the file); "dialog" shows the print window.
+ */
+async function printPage({ url, settings }) {
+  const page = new BrowserWindow({ show: false, webPreferences: { sandbox: true } });
+  try {
+    await page.loadURL(url);
+    const printers = await page.webContents.getPrintersAsync();
+    const wanted = printers.find(printer => printer.name === settings.printer);
+    const silent = settings.print !== 'dialog' && Boolean(wanted);
+    return await new Promise(resolve => {
+      page.webContents.print(
+        { silent, deviceName: wanted?.name, printBackground: true, pageSize: 'A4', margins: { marginType: 'default' } },
+        (success, reason) => resolve({ success, reason: reason || null, printer: silent ? wanted.name : 'the printer you chose' }),
+      );
+    });
+  } finally {
+    page.destroy();
+  }
+}
+
 app.whenReady().then(async () => {
   const port = option('port');
-  harness = await createApp({ rootDir, overrides: port ? { port: Number(port) } : {} });
+  harness = await createApp({
+    rootDir,
+    overrides: port ? { port: Number(port) } : {},
+    parts: flag('no-print') ? {} : { printer: printPage },
+  });
   await harness.listen();
   for (const note of harness.notes) console.log(`Note: ${note}`);
 
