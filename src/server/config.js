@@ -31,7 +31,9 @@ export async function loadConfig(rootDir, overrides = {}) {
     gate: { repeatFirst: true },
     voice: {
       tts: {
-        engine: existsSync(path.join(siblingVoder, 'voder', 'engine.py')) ? 'voder' : 'browser',
+        // The robot voice if the voder project sits next door; otherwise the voice built into
+        // Windows, so a fresh copy can speak without any extra setup.
+        engine: existsSync(path.join(siblingVoder, 'voder', 'engine.py')) ? 'voder' : process.platform === 'win32' ? 'windows' : 'browser',
         python: 'python',
         voderPath: siblingVoder,
         pitch: 104,
