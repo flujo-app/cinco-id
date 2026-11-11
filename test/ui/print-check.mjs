@@ -16,7 +16,7 @@ import { promises as fs } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'beta-sequence-print-'));
+const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'cinco-id-print-'));
 
 const NATIVE = `
 Add-Type @"
@@ -68,7 +68,7 @@ const dialogsBefore = new Set(printDialogs(before).map(window => window.handle))
 const app = await electron.launch({
   args: ['.', '--port=19785', '--silent', '--no-tray'],
   cwd: root,
-  env: { ...process.env, BETA_SEQUENCE_CONFIG: 'none', BETA_SEQUENCE_STATE_DIR: path.join(temp, 'state'), BETA_SEQUENCE_PRINTOUTS_DIR: path.join(temp, 'printouts') },
+  env: { ...process.env, CINCO_ID_CONFIG: 'none', CINCO_ID_OPERATOR: 'Paul', CINCO_ID_STATE_DIR: path.join(temp, 'state'), CINCO_ID_PRINTOUTS_DIR: path.join(temp, 'printouts') },
 });
 const problems = [];
 let dialog = null;

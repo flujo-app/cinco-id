@@ -172,11 +172,11 @@ test('the window limit holds no matter how often it is kicked up', async () => {
 
 test('incoming calls show who is calling and can be declined', async () => {
   const { computer, lastSaid } = await boot();
-  computer.incomingCall({ callId: 'c1', isVideo: false, contact: { name: 'Anna Example', pushname: 'Anna', number: '4915112345678', isMyContact: true } });
+  computer.incomingCall({ callId: 'c1', isVideo: false, contact: { name: 'Anna Example', pushname: 'Anna', number: '15550100123', isMyContact: true } });
   assert.equal(lastSaid(), 'Paul, Anna Example is calling.');
   const call = [...computer.windows.values()].find(window => window.kind === 'call');
   assert.equal(call.call.caller, 'Anna Example');
-  assert.equal(call.call.contact.number, '4915112345678');
+  assert.equal(call.call.contact.number, '15550100123');
 
   await computer.hear('who is calling');
   assert.equal(lastSaid(), 'Paul, Anna Example is calling.');
@@ -185,8 +185,8 @@ test('incoming calls show who is calling and can be declined', async () => {
   assert.equal(lastSaid(), 'Missed call from Anna Example.');
   assert.ok(![...computer.windows.values()].some(window => window.kind === 'call'));
 
-  computer.incomingCall({ callId: 'c2', isVideo: true, contact: { name: null, pushname: '', number: '4930123456' } });
-  assert.equal(lastSaid(), 'Paul, +4930123456 is video calling.');
+  computer.incomingCall({ callId: 'c2', isVideo: true, contact: { name: null, pushname: '', number: '15550100456' } });
+  assert.equal(lastSaid(), 'Paul, +15550100456 is video calling.');
   await computer.hear('test call from my wife');
   assert.equal(lastSaid(), 'Paul, My Wife is calling.');
   await computer.hear('decline');
@@ -223,7 +223,7 @@ test('the voice can be listed and switched by name, and a missing voice is repor
 });
 
 test('new projects get a hex name and what was revealed is remembered', async () => {
-  const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'beta-sequence-'));
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'cinco-id-'));
   try {
     await fs.cp(root, path.join(temp, 'projects'), { recursive: true });
     const stateFile = path.join(temp, 'state.json');

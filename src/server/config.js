@@ -71,10 +71,10 @@ export async function loadConfig(rootDir, overrides = {}) {
     printouts: { dir: path.join(rootDir, 'printouts'), print: 'pdf', printer: 'Microsoft Print to PDF' },
     media: { python: 'python', script: path.join(rootDir, 'tools', 'media', 'generate.py'), enabled: true },
   };
-  // For tests and second copies: BETA_SEQUENCE_CONFIG=none ignores the settings file,
-  // BETA_SEQUENCE_STATE_DIR keeps their memory apart from the real one.
+  // For tests and second copies: CINCO_ID_CONFIG=none ignores the settings file,
+  // CINCO_ID_STATE_DIR keeps their memory apart from the real one.
   const env = process.env;
-  const configFile = env.BETA_SEQUENCE_CONFIG === 'none' ? null : env.BETA_SEQUENCE_CONFIG || path.join(rootDir, 'harness.config.json');
+  const configFile = env.CINCO_ID_CONFIG === 'none' ? null : env.CINCO_ID_CONFIG || path.join(rootDir, 'harness.config.json');
   let fromFile = {};
   if (configFile) {
     try {
@@ -84,9 +84,10 @@ export async function loadConfig(rootDir, overrides = {}) {
     }
   }
   const fromEnv = {};
-  if (env.BETA_SEQUENCE_PORT) fromEnv.port = Number(env.BETA_SEQUENCE_PORT);
-  if (env.BETA_SEQUENCE_STATE_DIR) fromEnv.stateDir = env.BETA_SEQUENCE_STATE_DIR;
-  if (env.BETA_SEQUENCE_PROJECTS_DIR) fromEnv.projectsDir = env.BETA_SEQUENCE_PROJECTS_DIR;
-  if (env.BETA_SEQUENCE_PRINTOUTS_DIR) fromEnv.printouts = { dir: env.BETA_SEQUENCE_PRINTOUTS_DIR };
+  if (env.CINCO_ID_PORT) fromEnv.port = Number(env.CINCO_ID_PORT);
+  if (env.CINCO_ID_OPERATOR) fromEnv.operator = env.CINCO_ID_OPERATOR;
+  if (env.CINCO_ID_STATE_DIR) fromEnv.stateDir = env.CINCO_ID_STATE_DIR;
+  if (env.CINCO_ID_PROJECTS_DIR) fromEnv.projectsDir = env.CINCO_ID_PROJECTS_DIR;
+  if (env.CINCO_ID_PRINTOUTS_DIR) fromEnv.printouts = { dir: env.CINCO_ID_PRINTOUTS_DIR };
   return merge(merge(merge(defaults, fromFile), fromEnv), overrides);
 }

@@ -11,16 +11,16 @@ const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
 const args = process.argv.slice(2);
 const overlay = args.includes('--overlay');
 const shots = args.find(arg => !arg.startsWith('--')) ?? null;
-const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'beta-sequence-ui-'));
+const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'cinco-id-ui-'));
 
 const app = await electron.launch({
   args: ['.', '--port=19781', '--silent', '--no-tray', '--no-print', ...(overlay ? ['--overlay'] : [])],
   cwd: root,
   env: {
     ...process.env,
-    BETA_SEQUENCE_CONFIG: 'none',
-    BETA_SEQUENCE_STATE_DIR: path.join(temp, 'state'),
-    BETA_SEQUENCE_PRINTOUTS_DIR: path.join(temp, 'printouts'),
+    CINCO_ID_CONFIG: 'none', CINCO_ID_OPERATOR: 'Paul',
+    CINCO_ID_STATE_DIR: path.join(temp, 'state'),
+    CINCO_ID_PRINTOUTS_DIR: path.join(temp, 'printouts'),
   },
 });
 

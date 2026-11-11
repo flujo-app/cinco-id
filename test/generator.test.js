@@ -24,7 +24,7 @@ console.log(JSON.stringify({ done: true, media: out + '/media.json', costUsdEsti
 `;
 
 async function setup() {
-  const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'beta-sequence-gen-'));
+  const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'cinco-id-gen-'));
   const script = path.join(temp, 'fake-generate.mjs');
   await fs.writeFile(script, FAKE);
   await fs.cp(projects, path.join(temp, 'projects'), { recursive: true });
