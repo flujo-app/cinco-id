@@ -1,20 +1,20 @@
 {
   "name": "Tayne",
   "aliases": ["tain", "tane", "taine", "tayn", "thane", "tein", "tang"],
-  "description": "A flamboyant entertainer in a sparkly teal jumpsuit, a very large wide-brimmed dark hat and white boots, doing a confident strut. An invented person.",
+  "description": "A man around forty in a black flat-brimmed hat, black sunglasses, a gold chain, a loud orange-gold and black baroque silk shirt, black leather trousers and boots, doing a wide-legged squat groove and a confident strut. An invented person.",
   "beta": true,
-  "hatLine": 0.23,
+  "hatLine": 0.24,
   "expressions": ["smiling"],
   "puppet": {
     "rig": "humanoid",
     "dance": "strut",
-    "style": { "head": "round", "hat": "wide", "hatColor": "#1c1c28", "suit": "#12a39a", "sparkle": true, "shoes": "#f4f4f4", "skin": "#e8b796" }
+    "style": { "head": "round", "hat": "wide", "hatColor": "#141414", "suit": "#d4862a", "sparkle": false, "shoes": "#141414", "skin": "#e8b796" }
   },
   "variants": {
     "nude": {
       "gated": true,
-      "description": "The same performer in a lime-green sling swimsuit (a mankini), still wearing the hat and boots. A silly beach costume, nothing explicit.",
-      "puppet": { "style": { "suit": null, "sparkle": false, "mankini": "#9be22a", "shoes": "#f4f4f4" } }
+      "description": "The same performer in a lime-green sling swimsuit (a mankini) with two stacked yellow swim rings (the top one has a rubber-duck head) hiding everything from the belly button to the upper thighs, still in the black hat, sunglasses, gold chain and boots. A silly beach costume, nothing explicit.",
+      "puppet": { "style": { "suit": null, "sparkle": false, "mankini": "#9be22a", "shoes": "#141414" } }
     }
   }
 }
