@@ -134,7 +134,8 @@ function humanoid(ctx, style, dance, t, expression) {
   const p = pose(dance, t);
   const skin = style.skin ?? '#e8b796';
   const mannequin = style.mannequin === true;
-  const suit = mannequin ? skin : style.suit ?? '#777';
+  const mankini = style.mankini ?? null; // colour of the sling swimsuit, when worn
+  const suit = mannequin || mankini ? skin : style.suit ?? '#777';
   const cx = FRAME_W / 2 + p.sway;
   const hipY = 196 - p.bounce;
   const shoulderY = hipY - 78;
@@ -177,6 +178,15 @@ function humanoid(ctx, style, dance, t, expression) {
     ctx.strokeStyle = 'rgba(120, 80, 50, 0.45)'; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.moveTo(shoulderX, shoulderY + 4); ctx.lineTo(cx + p.hip * 20, hipY + 6); ctx.stroke();
     blob(ctx, cx + p.hip * 20, hipY + 4, 20, 7, '#d9a985');
+  } else if (mankini) {
+    // two straps from the shoulders down to a small pair of trunks
+    const hipX = cx + p.hip * 20;
+    ctx.beginPath();
+    ctx.moveTo(hipX - 15, hipY - 6); ctx.lineTo(hipX + 15, hipY - 6); ctx.lineTo(hipX + 9, hipY + 12); ctx.lineTo(hipX - 9, hipY + 12);
+    ctx.closePath();
+    ctx.fillStyle = mankini; ctx.fill();
+    ctx.lineWidth = 1.5; ctx.strokeStyle = OUTLINE; ctx.stroke();
+    for (const side of [-1, 1]) limb(ctx, shoulderX + side * 17, shoulderY + 2, hipX + side * 9, hipY - 5, 6, mankini);
   } else if (style.shirt) {
     ctx.beginPath();
     ctx.moveTo(shoulderX - 9, shoulderY); ctx.lineTo(shoulderX + 9, shoulderY); ctx.lineTo(shoulderX + (cx - shoulderX) * 0.5, shoulderY + 42);
