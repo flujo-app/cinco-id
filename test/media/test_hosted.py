@@ -1,4 +1,4 @@
-"""Seedance dance step against a fake local OpenRouter (no network, no key, no cost).
+"""Hosted dance step against a fake local OpenRouter (no network, no key, no cost).
 
 Run from the repository root:
     python -m unittest discover -s test/media -v
@@ -22,7 +22,7 @@ sys.path.insert(0, str(ROOT / "tools" / "media"))
 
 import generate  # noqa: E402
 import make_cast  # noqa: E402
-import media_seedance as SD  # noqa: E402
+import media_hosted as SD  # noqa: E402
 
 KEY = "sk-or-test-0123456789abcdef"
 REAL_HTTP = SD.Http
@@ -34,8 +34,19 @@ CATALOG = {"data": [{
     "supported_resolutions": ["480p", "720p"], "supported_aspect_ratios": ["16:9", "3:4", "9:16"],
     "supported_sizes": ["854x480", "560x752", "480x854", "834x1112", "720x1280"],
     "supported_durations": list(range(4, 31)), "supported_frame_images": ["first_frame", "last_frame"],
-    "pricing_skus": {"video_tokens": "0.0000107", "video_tokens_without_audio": "0.0000107"},
+    "pricing_skus": {"video_tokens": "0.0000107", "video_tokens_without_audio": "0.0000107"}, "seed": True,
+}, {
+    "id": "minimax/hailuo-3-max", "canonical_slug": "minimax/hailuo-3-max-20260901",
+    "supported_resolutions": ["768p", "480p"], "supported_aspect_ratios": ["16:9", "3:4", "9:16"],
+    "supported_sizes": None, "supported_durations": list(range(5, 16)),
+    "supported_frame_images": ["first_frame", "last_frame"], "seed": False,
+    "pricing_skus": {"duration_seconds": "0.08", "duration_seconds_480p": "0.05", "duration_seconds_768p": "0.08"},
+}, {
+    "id": "minimax/hailuo-2.3", "supported_resolutions": ["1080p"], "supported_aspect_ratios": ["16:9"],
+    "supported_durations": [6, 10], "supported_frame_images": ["first_frame"],
+    "pricing_skus": {"duration_seconds": "0.0817"},
 }]}
+PLAN = SD.plan_clip(SD.find_model(CATALOG), "480p")
 
 
 class Fake:
@@ -134,6 +145,15 @@ class PriceTests(unittest.TestCase):
         self.assertEqual(SD.estimate_usd(model, "480p"), Decimal("0.528"))
         self.assertEqual(SD.estimate_usd(model, "720p"), Decimal("1.163"))
 
+    def test_per_second_prices(self):
+        model = SD.find_model(CATALOG, "minimax/hailuo-3-max")
+        self.assertEqual(SD.estimate_usd(model, "480p"), Decimal("0.250"))
+        self.assertEqual(SD.estimate_usd(model, "768p"), Decimal("0.400"))
+        cents = {"id": "x/y", "supported_resolutions": ["720p"], "supported_aspect_ratios": ["3:4"],
+                 "supported_durations": [5], "supported_frame_images": ["first_frame", "last_frame"],
+                 "pricing_skus": {"cents_per_second_output_720p": "17"}}
+        self.assertEqual(SD.estimate_usd(cents, "720p"), Decimal("0.850"))
+
     def test_catalogue_changes_are_caught(self):
         model = json.loads(json.dumps(SD.find_model(CATALOG)))
         model["supported_sizes"].remove("560x752")
@@ -149,7 +169,7 @@ class PriceTests(unittest.TestCase):
 
 class RequestTests(unittest.TestCase):
     def test_same_picture_first_and_last_no_audio(self):
-        request = SD.build_request("dance", PNG, "480p", seed=7)
+        request = SD.build_request("dance", PNG, PLAN, seed=7)
         self.assertEqual(request["model"], "bytedance/seedance-2.5")
         self.assertEqual((request["duration"], request["size"], request["aspect_ratio"]), (5, "560x752", "3:4"))
         self.assertIs(request["generate_audio"], False)
@@ -162,9 +182,22 @@ class RequestTests(unittest.TestCase):
 
     def test_rejects_non_png_and_bad_resolution(self):
         with self.assertRaises(SD.SeedanceError):
-            SD.build_request("dance", b"GIF89a", "480p", 1)
+            SD.build_request("dance", b"GIF89a", PLAN, 1)
         with self.assertRaises(SD.SeedanceError):
-            SD.build_request("dance", PNG, "1080p", 1)
+            SD.plan_clip(SD.find_model(CATALOG), "1080p")
+
+    def test_per_second_model_has_no_size_and_no_seed(self):
+        plan = SD.plan_clip(SD.find_model(CATALOG, "minimax/hailuo-3-max"), "480p")
+        request = SD.build_request("dance", PNG, plan, seed=7)
+        self.assertEqual(request["model"], "minimax/hailuo-3-max")
+        self.assertNotIn("size", request)
+        self.assertNotIn("seed", request)
+        self.assertEqual(request["aspect_ratio"], "3:4")
+
+    def test_model_without_last_frame_is_refused(self):
+        with self.assertRaises(SD.SeedanceError) as caught:
+            SD.plan_clip(SD.find_model(CATALOG, "minimax/hailuo-2.3"), "1080p")
+        self.assertIn("last frame", str(caught.exception))
 
     def test_key_only_from_environment(self):
         with mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": "  sk-or-abc  "}):
@@ -184,7 +217,7 @@ class FlowTests(unittest.TestCase):
     def test_happy_path_polls_and_downloads(self):
         with FakeServers() as servers:
             statuses = []
-            result = SD.make_clip(servers.http(), SD.build_request("dance", PNG, "480p", 3),
+            result = SD.make_clip(servers.http(), SD.build_request("dance", PNG, PLAN, 3),
                                   on_status=lambda job: statuses.append(job["status"]), sleep=lambda s: None)
             fake = servers.fake
         self.assertEqual(result["video"], FAKE_MP4)
@@ -200,7 +233,7 @@ class FlowTests(unittest.TestCase):
             servers.fake.statuses = ["pending", "failed"]
             servers.fake.final_error = "the picture was refused"
             with self.assertRaises(SD.SeedanceError) as caught:
-                SD.make_clip(servers.http(), SD.build_request("dance", PNG, "480p", 3), sleep=lambda s: None)
+                SD.make_clip(servers.http(), SD.build_request("dance", PNG, PLAN, 3), sleep=lambda s: None)
             self.assertEqual(len(servers.fake.posts), 1)
         self.assertIn("could not make the dance", str(caught.exception))
 
@@ -208,7 +241,7 @@ class FlowTests(unittest.TestCase):
         with FakeServers() as servers:
             servers.fake.submit_status = 400
             with self.assertRaises(SD.HttpError) as caught:
-                SD.make_clip(servers.http(), SD.build_request("dance", PNG, "480p", 3), sleep=lambda s: None)
+                SD.make_clip(servers.http(), SD.build_request("dance", PNG, PLAN, 3), sleep=lambda s: None)
             self.assertEqual(len(servers.fake.posts), 1)
         self.assertNotIn(KEY, str(caught.exception))
         self.assertIn("did not accept", str(caught.exception))
@@ -218,14 +251,14 @@ class FlowTests(unittest.TestCase):
             servers.fake.statuses = ["in_progress"]
             ticks = iter(range(0, 10000, 100))
             with self.assertRaises(SD.SeedanceError) as caught:
-                SD.make_clip(servers.http(), SD.build_request("dance", PNG, "480p", 3), max_wait=250,
+                SD.make_clip(servers.http(), SD.build_request("dance", PNG, PLAN, 3), max_wait=250,
                              sleep=lambda s: None, clock=lambda: next(ticks))
         self.assertIn("not ready in time", str(caught.exception))
 
     def test_missing_key_stops_before_sending(self):
         with FakeServers() as servers:
             with self.assertRaises(SD.SeedanceError):
-                SD.make_clip(servers.http(key=""), SD.build_request("dance", PNG, "480p", 3), sleep=lambda s: None)
+                SD.make_clip(servers.http(key=""), SD.build_request("dance", PNG, PLAN, 3), sleep=lambda s: None)
             self.assertEqual(servers.fake.posts, [])
 
     def test_catalogue_is_read_without_key(self):
@@ -258,16 +291,31 @@ class CommandTests(unittest.TestCase):
         self.assertEqual(code, 0)
         result = lines[-1]
         self.assertTrue(result["dryRun"])
-        self.assertEqual(result["seedanceUsdPerClip"], {"480p": 0.528, "720p": 1.163})
+        self.assertEqual(result["usdPerClip"], {"480p": 0.528, "720p": 1.163})
         self.assertFalse(result["keyPresent"])
         self.assertEqual(result["request"]["size"], "560x752")
 
     def test_engine_default_follows_key(self):
+        # The default is always our own Modal route, key or not; Seedance only when asked for.
         with mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": KEY}):
-            self.assertEqual(generate.choose_engine(None), "seedance")
+            self.assertIn(generate.choose_engine(None), {"wan", "ltx"})
         with mock.patch.dict(os.environ, {}, clear=True):
-            self.assertEqual(generate.choose_engine(None), "ltx")
-        self.assertEqual(generate.choose_engine("ltx"), "ltx")
+            self.assertIn(generate.choose_engine(None), {"wan", "ltx"})
+        self.assertEqual(generate.choose_engine("seedance"), "openrouter")
+        self.assertEqual(generate.choose_engine("openrouter"), "openrouter")
+
+    def test_seedance_cap_stops_before_sending(self):
+        with FakeServers() as servers:
+            fake_http = lambda *a, **k: REAL_HTTP(api=servers.base, key=k.get("key", ""), timeout=10)  # noqa: E731
+            with mock.patch.object(SD, "Http", fake_http), \
+                    mock.patch.object(generate, "hosted_spent", lambda: 4.8), \
+                    mock.patch.dict(os.environ, {"OPENROUTER_API_KEY": KEY}):
+                code, lines = self.capture(generate.main, ["--name", "X", "--prompt", "a", "--out", str(ROOT / ".no-such"),
+                                                           "--engine", "seedance", "--from-still"])
+            self.assertEqual(servers.fake.posts, [])
+        self.assertNotEqual(code, 0)
+        self.assertIn("cap", lines[-1]["error"])
+        self.assertFalse((ROOT / ".no-such").exists())
 
     def test_real_seedance_run_without_key_spends_nothing(self):
         with mock.patch.dict(os.environ, {}, clear=True):

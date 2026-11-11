@@ -1,4 +1,10 @@
-"""Dance step through Seedance 2.5 on OpenRouter (a paid, hosted service).
+"""Dance step through a hosted video model on OpenRouter (paid per clip).
+
+Any model in OpenRouter's public video catalogue that accepts a first AND a last
+frame picture can be used (default: Seedance 2.5; MiniMax H3 Max also checked).
+The catalogue is read live before every clip to confirm the model still offers
+what we ask for and to compute the price, which may be listed per second or per
+"video token".
 
 - The key is read only from the OPENROUTER_API_KEY environment variable.
 - One clip = one POST. A POST is never retried, even after a timeout, so a
@@ -23,7 +29,7 @@ from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 
 from media_settings import (
-    OPENROUTER_API, SEEDANCE_FPS, SEEDANCE_MODEL, SEEDANCE_PRICE_SKU, SEEDANCE_SECONDS, SEEDANCE_SIZES,
+    OPENROUTER_API, SEEDANCE_FPS, SEEDANCE_MODEL, SEEDANCE_SECONDS,
 )
 
 TERMINAL_FAILURES = {"failed", "cancelled", "expired"}
@@ -150,64 +156,115 @@ def money(value) -> Decimal:
     return result
 
 
-def find_model(catalog: dict) -> dict:
-    matches = [m for m in catalog.get("data", []) if isinstance(m, dict) and m.get("id") == SEEDANCE_MODEL]
+DEFAULT_MODEL = SEEDANCE_MODEL
+# Typical pixel count per resolution name, used to pick the matching 3:4 size from the catalogue.
+RESOLUTION_PIXELS = {"360p": 360 * 640, "480p": 480 * 854, "720p": 720 * 1280, "768p": 768 * 1365,
+                     "1080p": 1080 * 1920}
+
+
+def find_model(catalog: dict, model_id: str = DEFAULT_MODEL) -> dict:
+    matches = [m for m in catalog.get("data", []) if isinstance(m, dict) and m.get("id") == model_id]
     if len(matches) != 1:
-        raise SeedanceError(f"{SEEDANCE_MODEL} is not in the OpenRouter video catalogue")
+        raise SeedanceError(f"{model_id} is not in the OpenRouter video catalogue")
     return matches[0]
 
 
+def _portrait_size(model: dict, resolution: str) -> str | None:
+    """The catalogue's 3:4 portrait size closest to this resolution, if the model lists sizes."""
+    portrait = []
+    for size in model.get("supported_sizes") or []:
+        width, _, height = size.partition("x")
+        if width.isdigit() and height.isdigit() and int(width) < int(height) \
+                and abs(int(width) / int(height) - 0.75) < 0.02:
+            portrait.append(size)
+    target = RESOLUTION_PIXELS.get(resolution, 480 * 854)
+    pixels = {size: int(size.split("x")[0]) * int(size.split("x")[1]) for size in portrait}
+    close = [size for size in portrait if abs(pixels[size] - target) <= 0.35 * target]
+    return min(close, key=lambda s: abs(pixels[s] - target)) if close else None
+
+
+def _price(model: dict, resolution: str) -> tuple[str, str, Decimal]:
+    """(kind, price name, US dollars) for a silent picture-to-video clip at this resolution."""
+    skus = model.get("pricing_skus") or {}
+    per_second = [f"image_to_video_duration_seconds_{resolution}", f"duration_seconds_without_audio_{resolution}",
+                  f"duration_seconds_{resolution}", "duration_seconds_without_audio", "duration_seconds",
+                  f"duration_seconds_with_audio_{resolution}", "duration_seconds_with_audio"]
+    for sku in per_second:
+        if sku in skus:
+            return "second", sku, money(skus[sku])
+    for sku in (f"cents_per_second_output_{resolution}", "cents_per_second_output"):
+        if sku in skus:
+            return "second", sku, money(skus[sku]) / 100
+    for sku in (f"video_tokens_{resolution}", "video_tokens_without_audio", "video_tokens"):
+        if sku in skus:
+            return "token", sku, money(skus[sku])
+    raise SeedanceError(f"{model.get('id')} has no price this tool understands")
+
+
+def plan_clip(model: dict, resolution: str, seconds: int = SEEDANCE_SECONDS) -> dict:
+    """Check the live catalogue offers what the loop trick needs and price one clip."""
+    name = model.get("id", "?")
+    if not {"first_frame", "last_frame"} <= set(model.get("supported_frame_images") or []):
+        raise SeedanceError(f"{name} cannot take both a first and a last frame picture, so it cannot loop")
+    if seconds not in (model.get("supported_durations") or []):
+        raise SeedanceError(f"{name} does not offer {seconds}-second clips")
+    if resolution not in (model.get("supported_resolutions") or []):
+        offered = ", ".join(model.get("supported_resolutions") or []) or "none"
+        raise SeedanceError(f"{name} does not offer {resolution} (it offers {offered})")
+    if "3:4" not in (model.get("supported_aspect_ratios") or []):
+        raise SeedanceError(f"{name} does not offer the 3:4 portrait shape")
+    size = _portrait_size(model, resolution)
+    kind, sku, rate = _price(model, resolution)
+    if kind == "token":
+        if not size:
+            raise SeedanceError(f"{name} is priced per video token but lists no 3:4 size to count them")
+        usd = video_tokens(size, seconds) * rate
+    else:
+        usd = rate * seconds
+    return {"model": name, "canonical": model.get("canonical_slug", name), "resolution": resolution,
+            "aspect": "3:4", "size": size, "seconds": seconds, "priceKind": kind, "priceSku": sku,
+            "rate": str(rate), "usd": usd.quantize(Decimal("0.001")), "seed": bool(model.get("seed"))}
+
+
 def check_model(model: dict, resolution: str, seconds: int = SEEDANCE_SECONDS) -> dict:
-    """Confirm the catalogue still offers exactly what we ask for; returns the price facts."""
-    if resolution not in SEEDANCE_SIZES:
-        raise SeedanceError("Resolution must be 480p or 720p")
-    size = SEEDANCE_SIZES[resolution]
-    needs = [("supported_resolutions", resolution), ("supported_sizes", size),
-             ("supported_aspect_ratios", "3:4"), ("supported_durations", seconds)]
-    for field, value in needs:
-        if value not in model.get(field, []):
-            raise SeedanceError(f"The catalogue no longer offers {value} for {SEEDANCE_MODEL}")
-    if not {"first_frame", "last_frame"} <= set(model.get("supported_frame_images", [])):
-        raise SeedanceError("The catalogue no longer offers first and last frame pictures")
-    price = money(model.get("pricing_skus", {}).get(SEEDANCE_PRICE_SKU))
-    return {"size": size, "usdPerVideoToken": str(price), "canonical": model.get("canonical_slug", SEEDANCE_MODEL)}
+    return plan_clip(model, resolution, seconds)
 
 
 def video_tokens(size: str, seconds: int = SEEDANCE_SECONDS, fps: int = SEEDANCE_FPS) -> Decimal:
     """Video tokens = width x height x frames per second x seconds / 1024.
 
-    This matches the catalogue's headline "from $0.1028/second" at 480x854
-    (480 * 854 * 24 / 1024 = 9607.5 tokens/s x $0.0000107 = $0.1028/s).
+    This matches the catalogue's headline for Seedance 2.5, "from $0.1028/second" at
+    480x854 (480 * 854 * 24 / 1024 = 9607.5 tokens/s x $0.0000107 = $0.1028/s).
     """
     width, height = (int(part) for part in size.split("x"))
     return Decimal(width * height * fps * seconds) / Decimal(1024)
 
 
 def estimate_usd(model: dict, resolution: str, seconds: int = SEEDANCE_SECONDS) -> Decimal:
-    facts = check_model(model, resolution, seconds)
-    return (video_tokens(facts["size"], seconds) * Decimal(facts["usdPerVideoToken"])).quantize(Decimal("0.001"))
+    return plan_clip(model, resolution, seconds)["usd"]
 
 
 # --- request, polling, download ------------------------------------------------------
-def build_request(prompt: str, keyframe_png: bytes, resolution: str, seed: int,
-                  seconds: int = SEEDANCE_SECONDS) -> dict:
+def build_request(prompt: str, keyframe_png: bytes, plan: dict, seed: int) -> dict:
     if not keyframe_png.startswith(b"\x89PNG"):
         raise SeedanceError("The first-frame picture must be a PNG")
     if len(keyframe_png) > MAX_IMAGE_BYTES:
         raise SeedanceError("The first-frame picture is too large")
-    if resolution not in SEEDANCE_SIZES:
-        raise SeedanceError("Resolution must be 480p or 720p")
     url = "data:image/png;base64," + base64.b64encode(keyframe_png).decode("ascii")
-    return {
-        "model": SEEDANCE_MODEL, "prompt": prompt, "duration": seconds, "resolution": resolution,
-        "aspect_ratio": "3:4", "size": SEEDANCE_SIZES[resolution], "generate_audio": False,
-        "seed": int(seed) % (2 ** 31),
+    request = {
+        "model": plan["model"], "prompt": prompt, "duration": plan["seconds"], "resolution": plan["resolution"],
+        "aspect_ratio": plan["aspect"], "generate_audio": False,
         # The same picture as first AND last frame: the dance ends where it started, so it loops.
         "frame_images": [
             {"type": "image_url", "image_url": {"url": url}, "frame_type": "first_frame"},
             {"type": "image_url", "image_url": {"url": url}, "frame_type": "last_frame"},
         ],
     }
+    if plan.get("size"):
+        request["size"] = plan["size"]
+    if plan.get("seed"):
+        request["seed"] = int(seed) % (2 ** 31)
+    return request
 
 
 def describe_request(request: dict) -> dict:

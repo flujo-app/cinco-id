@@ -7,6 +7,7 @@ from __future__ import annotations
 # --- Names -----------------------------------------------------------------
 APP_NAME = "beta-sequence-media"
 ART_WEIGHTS_VOLUME = "beta-sequence-art-weights"   # ours: picture + cut-out models
+WAN_WEIGHTS_VOLUME = "beta-sequence-wan-weights"   # ours: Wan2.2 image-to-video
 # Another project's verified LTX-2.5 cache. Mounted READ-ONLY, never written.
 LTX_CACHE_VOLUME = "morriton-ltx-2-5-model-cache"
 
@@ -57,6 +58,13 @@ LTX_FILES = {
                        "86370bbf79a9eb4edaa158907e2b48a5188fe4c5dc8ce30c7eb8f2f131a9bbf5"),
 }
 
+# --- Motion model 2: Wan2.2 image-to-video A14B (Apache-2.0, ungated) ------------
+# Exact file list with checksums: wan_files.json next to this file.
+WAN_REPO = "Wan-AI/Wan2.2-I2V-A14B-Diffusers"
+WAN_REVISION = "596658fd9ca6b7b71d5057529bbf319ecbc61d74"
+WAN_LICENSE = "apache-2.0"
+WAN_WIDTH, WAN_HEIGHT = 544, 720               # 3:4, about Wan's 480p pixel count, divisible by 16
+
 # --- Software pins ------------------------------------------------------------
 TORCH_PACKAGES = ("torch==2.9.1", "torchvision==0.24.1", "torchaudio==2.9.1")
 TORCH_INDEX = "https://download.pytorch.org/whl/cu128"
@@ -80,15 +88,17 @@ MOTION_FRAMES = 97                             # 8n+1; last frame repeats the fi
 OUTPUT_WIDTH, OUTPUT_HEIGHT = 540, 720         # final clip and stills
 PICTURE_WIDTH, PICTURE_HEIGHT = 960, 1280      # Z-Image drawing size (3:4)
 
-# --- Dance engine 2: Seedance 2.5 through OpenRouter (paid per clip, owner's key) ---
+# --- Hosted dance engine: OpenRouter video models (paid per clip, owner's key) -------
 OPENROUTER_API = "https://openrouter.ai/api/v1"
-SEEDANCE_MODEL = "bytedance/seedance-2.5"
+SEEDANCE_MODEL = "bytedance/seedance-2.5"                  # default hosted model
 SEEDANCE_SECONDS = 5
-SEEDANCE_SIZES = {"480p": "560x752", "720p": "834x1112"}   # 3:4 portrait sizes in the catalogue
-SEEDANCE_PRICE_SKU = "video_tokens_without_audio"
 SEEDANCE_FPS = 24                                          # used for the video-token count
-# Catalogue price read 2026-11-11 (USD per video token); the live catalogue is checked before use.
-SEEDANCE_PRICE_READ = {"date": "2026-11-11", "usdPerVideoToken": "0.0000107"}
+# Catalogue prices read 2026-11-11; the live catalogue is checked again before every clip.
+HOSTED_PRICES_READ = {
+    "date": "2026-11-11",
+    "bytedance/seedance-2.5": "USD 0.0000107 per video token (no audio)",
+    "minimax/hailuo-3-max": "USD 0.05 per second at 480p, 0.08 per second at 768p",
+}
 FIGURE_HEIGHT_SHARE = 0.76                     # figure height as share of the canvas
 FIGURE_MAX_WIDTH_SHARE = 0.80
 FEET_LINE = 0.92                               # where the feet stand, from the top
@@ -128,6 +138,12 @@ def rate_per_second(gpu: str | None, cpu: float, memory_mib: int) -> float:
 ART_RATE = rate_per_second(ART_GPU, ART_CPU, ART_MEMORY_MIB)
 MOTION_RATE = rate_per_second(MOTION_GPU, MOTION_CPU, MOTION_MEMORY_MIB)
 PREPARE_RATE = rate_per_second(None, PREPARE_CPU, PREPARE_MEMORY_MIB)
+WAN_PREPARE_RATE = rate_per_second(None, 4, 16384)
+
+# Dance engines that run on our own Modal account (no other account or key needed),
+# with typical seconds of H200 time per clip including start-up and model loading.
+MODAL_DANCE_SECONDS = {"wan": 420, "ltx": 240}
+DEFAULT_ENGINE = "wan"
 
 # Upper bound used before starting: art 240 s, motion 420 s, cut-out 240 s.
 WORST_CASE_USD = round(240 * ART_RATE + 420 * MOTION_RATE + 240 * ART_RATE, 2)
@@ -142,10 +158,12 @@ def model_records(engine: str = "ltx") -> list[dict]:
     if engine == "ltx":
         records.insert(1, {"repo": LTX_REPO, "revision": LTX_REVISION, "license": LTX_LICENSE, "role": "dance motion",
                            "code": f"{LTX_CODE_REPOSITORY}@{LTX_CODE_REVISION}"})
+    if engine == "wan":
+        records.insert(1, {"repo": WAN_REPO, "revision": WAN_REVISION, "license": WAN_LICENSE, "role": "dance motion"})
     return records
 
 
-def seedance_record(canonical_slug: str) -> dict:
-    """Hosted dance model: no downloadable weights, so it is recorded by its dated catalogue name."""
-    return {"service": "OpenRouter", "model": SEEDANCE_MODEL, "version": canonical_slug, "role": "dance motion",
-            "weights": "hosted by ByteDance, not downloadable"}
+def hosted_record(model: str, canonical_slug: str) -> dict:
+    """Hosted dance model: no weights we can pin, so it is recorded by its dated catalogue name."""
+    return {"service": "OpenRouter", "model": model, "version": canonical_slug, "role": "dance motion",
+            "weights": "hosted by the model's maker, not downloaded"}

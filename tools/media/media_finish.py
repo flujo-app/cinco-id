@@ -179,31 +179,61 @@ def bleed_colors(rgb: np.ndarray, alpha: np.ndarray, radius: float = 6.0) -> np.
 def despill(rgb: np.ndarray, alpha: np.ndarray, key: np.ndarray, band: int = 3) -> np.ndarray:
     """Remove the backdrop's tint from the figure's outer edge.
 
-    Only pixels near the outline are touched. In those, the part of the colour
-    that points in the backdrop's colour direction is taken out, so a magenta
-    glow on a grey sleeve turns grey again while green celery stays green.
+    Only pixels near the outline are touched. This is the usual keyer rule: the
+    backdrop's strong channels (red and blue for magenta) are pulled down to the
+    level of its weak channels (green) only where ALL strong channels stand out,
+    which skin, celery or a teal suit never do. So a magenta glow on a grey
+    sleeve turns grey again while skin keeps its colour.
     """
     rgbf = rgb.astype(np.float32)
     key = np.asarray(key, np.float32)
-    direction = key - key.mean()
-    norm = float(np.linalg.norm(direction))
-    if norm < 1e-3:
+    high = np.flatnonzero(key > 0.6)
+    low = np.flatnonzero(key < 0.4)
+    if not len(high) or not len(low):
         return rgbf  # a grey or white backdrop has no tint to remove
-    direction /= norm
     near_edge = blur(alpha[..., None].astype(np.float32), band)[..., 0] < 0.97
-    chroma = rgbf - rgbf.mean(axis=2, keepdims=True)
-    spill = np.maximum(0.0, chroma @ direction)
-    cleaned = np.clip(rgbf - spill[..., None] * direction[None, None, :], 0.0, 1.0)
-    return np.where(near_edge[..., None], cleaned, rgbf).astype(np.float32)
+    spill = np.maximum(0.0, rgbf[..., high].min(axis=2) - rgbf[..., low].max(axis=2))
+    cleaned = rgbf.copy()
+    cleaned[..., high] -= spill[..., None]
+    # Video models also draw a thin halo in the opposite colour (green next to magenta).
+    # Only on the outermost ring of the outline, so green celery or teal cloth keeps its colour inside.
+    outer = blur(alpha[..., None].astype(np.float32), 1)[..., 0] < 0.9
+    halo = np.maximum(0.0, cleaned[..., low].min(axis=2) - cleaned[..., high].max(axis=2)) * outer
+    cleaned[..., low] -= halo[..., None]
+    return np.where(near_edge[..., None], np.clip(cleaned, 0.0, 1.0), rgbf).astype(np.float32)
+
+
+def trust_color(rgb: np.ndarray, alpha: np.ndarray, background: np.ndarray) -> np.ndarray:
+    """A pixel whose colour is far from the flat backdrop cannot be mostly see-through.
+
+    The matte model sometimes rates a motion-blurred hand as half transparent; un-mixing
+    the backdrop from such a pixel would tint the skin green. Raise its solidity instead.
+    """
+    rgbf = to_float(rgb) if rgb.dtype == np.uint8 else rgb
+    distance = np.linalg.norm(rgbf - background[None, None, :], axis=2)
+    from_color = np.clip((distance - 0.1) / 0.5, 0.0, 1.0)
+    return np.where(alpha > 0.05, np.maximum(alpha, from_color), alpha).astype(np.float32)
+
+
+def shrink(alpha: np.ndarray, pixels: int = 1) -> np.ndarray:
+    """Pull the outline in by a pixel: video models draw a thin coloured halo next to a bright backdrop."""
+    image = Image.fromarray(alpha.astype(np.float32), mode="F")
+    for _ in range(pixels):
+        image = image.filter(ImageFilter.MinFilter(3))
+    return np.asarray(image, np.float32)
 
 
 def cutout(rgb: np.ndarray, alpha: np.ndarray, background: np.ndarray | None = None,
-           tidy: bool = True, key: np.ndarray | None = None) -> np.ndarray:
+           tidy: bool = True, key: np.ndarray | None = None, erode: int = 0) -> np.ndarray:
     """RGB picture + rough alpha -> clean straight RGBA float image."""
     background = border_color(rgb) if background is None else background
     alpha = clean_alpha(rgb, alpha, background)
     if tidy:
         alpha = keep_main_figure(alpha)
+    if key is not None:
+        alpha = trust_color(rgb, alpha, background)
+    if erode:
+        alpha = shrink(alpha, erode)
     color = decontaminate(rgb, alpha, background)
     if key is not None:
         color = despill(color, alpha, key)

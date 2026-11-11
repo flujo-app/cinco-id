@@ -111,8 +111,34 @@ class FinishingTests(unittest.TestCase):
         edge = cleaned[20, 13]
         self.assertLess(abs(edge[0] - edge[1]), 0.02)            # glow gone: grey again
         self.assertTrue(np.allclose(cleaned[20, 30], rgb[20, 30]))  # interior untouched
-        green = np.full((10, 10, 3), (0.2, 0.8, 0.2), np.float32)
-        self.assertTrue(np.allclose(F.despill(green, np.full((10, 10), 0.5, np.float32), magenta), green))
+        solid = np.zeros((20, 20), np.float32)
+        solid[:, 5:] = 1.0
+        for color in [(0.2, 0.8, 0.2), (0.85, 0.62, 0.5), (0.07, 0.64, 0.6)]:   # celery, skin, teal suit
+            patch = np.full((20, 20, 3), color, np.float32)
+            cleaned = F.despill(patch, solid, magenta)
+            self.assertTrue(np.allclose(cleaned[:, 8:], patch[:, 8:]))          # a few pixels in: untouched
+            self.assertTrue(np.allclose(cleaned[..., [0, 2]], patch[..., [0, 2]]))  # red and blue never pulled
+
+    def test_blurred_hand_keeps_skin_colour(self):
+        magenta = np.array([1.0, 0.0, 1.0], np.float32)
+        rgb = np.zeros((30, 30, 3), np.uint8)
+        rgb[:] = (255, 0, 255)
+        rgb[10:20, 10:20] = (217, 158, 128)                      # skin
+        alpha = np.zeros((30, 30), np.float32)
+        alpha[10:20, 10:20] = 0.6                                # matte unsure about a blurred hand
+        rgba = F.cutout(rgb, alpha, magenta, key=magenta)
+        r, g, b = rgba[15, 15, :3]
+        self.assertGreater(r, g)                                 # still skin: red above green ...
+        self.assertGreater(g, b)                                 # ... and green above blue, not green-tinted
+        self.assertEqual(rgba[15, 15, 3], 1.0)
+
+    def test_green_halo_beside_magenta_is_removed(self):
+        rgb = np.full((20, 20, 3), (0.9, 0.9, 0.85), np.float32)       # white boot ...
+        rgb[:, 5] = (0.6, 0.9, 0.55)                                    # ... with a green halo on its edge
+        alpha = np.zeros((20, 20), np.float32)
+        alpha[:, 5:] = 1.0
+        cleaned = F.despill(rgb, alpha, np.array([1.0, 0.0, 1.0], np.float32))
+        self.assertLessEqual(cleaned[10, 5, 1], max(cleaned[10, 5, 0], cleaned[10, 5, 2]) + 1e-6)
 
     def test_key_color_avoids_figure_colours(self):
         rgb = np.zeros((40, 40, 3), np.uint8)
