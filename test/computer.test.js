@@ -156,7 +156,7 @@ test('it is a general tool, not only the routine', async () => {
   await computer.hear('kick up the four d three d three d three');
   assert.equal(lastSaid(), '4d3d3d3 engaged.');
   const names = new Set(computer.sequenceWindows().map(window => window.sequence.name));
-  assert.deepEqual([...names].sort(), ['Celery Man', 'Oyster'], 'the beta sequence stays hidden until asked for');
+  assert.deepEqual([...names].sort(), ['Celery Head', 'Celery Man', 'Oyster'], 'the beta sequence stays hidden until asked for');
 
   await computer.hear('clear the desktop');
   assert.equal(lastSaid(), 'Desktop cleared.');

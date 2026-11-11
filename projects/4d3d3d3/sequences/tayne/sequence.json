@@ -1,6 +1,7 @@
 {
   "name": "Tayne",
   "aliases": ["tain", "tane", "taine", "tayn", "thane", "tein", "tang"],
+  "description": "A flamboyant entertainer in a sparkly teal jumpsuit, a very large wide-brimmed dark hat and white boots, doing a confident strut. An invented person.",
   "beta": true,
   "hatLine": 0.23,
   "expressions": ["smiling"],
@@ -12,6 +13,7 @@
   "variants": {
     "nude": {
       "gated": true,
+      "description": "The same performer in a seamless skin-tone stage bodysuit, still wearing the hat and boots. A silly costume, nothing explicit.",
       "puppet": { "style": { "suit": null, "sparkle": false, "mannequin": true, "shoes": "#f4f4f4" } }
     }
   }
