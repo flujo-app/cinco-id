@@ -1,9 +1,10 @@
 // Records the demo video: the first-run Setup window, the start window, the 4d3d3d3 routine, the
 // dancer in d15c0, choosing a sequence by its picture and an incoming call, with the app's own
-// sound (voice, effects, music). THIS IS AUDIBLE and takes about three minutes. Nothing else on the PC is recorded: the picture is the app's own window
-// content, the sound is the app's own sound.
+// sound (voice, effects, music). It takes about three minutes and makes NO SOUND on this PC: the
+// sound is taken from inside the app while the loudspeakers stay off (add --loud to hear it while
+// it records). Nothing else on the PC is recorded: the picture is the app's own window content.
 //
-//   node tools/demo/record.mjs [output.mp4] [--voice robot|zira|<part of a Windows voice name>] [--keep-frames]
+//   node tools/demo/record.mjs [output.mp4] [--voice robot|zira|<part of a Windows voice name>] [--loud] [--keep-frames]
 //
 // Needs ffmpeg on the PATH. Uses a fresh temporary data folder, so your own settings and
 // projects are not touched.
@@ -16,6 +17,7 @@ import { freePort, root } from '../../test/ui/launch.mjs';
 
 const args = process.argv.slice(2);
 const keepFrames = args.includes('--keep-frames');
+const loud = args.includes('--loud');
 const voiceAt = args.indexOf('--voice');
 const voiceWanted = voiceAt >= 0 ? String(args.splice(voiceAt, 2)[1] ?? 'robot').toLowerCase() : 'robot';
 const output = path.resolve(args.find(arg => !arg.startsWith('--')) ?? path.join(root, 'docs', 'demo.mp4'));
@@ -35,7 +37,8 @@ const run = (command, commandArgs) => new Promise((resolve, reject) => {
 
 const port = await freePort(19790);
 const app = await electron.launch({
-  args: ['.', `--port=${port}`, '--no-tray', '--no-print'],
+  // --mute-audio switches off the loudspeakers only; the sound inside the app is still recorded.
+  args: ['.', `--port=${port}`, '--no-tray', '--no-print', ...(loud ? [] : ['--mute-audio'])],
   cwd: root,
   env: { ...process.env, CINCO_ID_DATA_DIR: dataDir, CINCO_ID_OPERATOR: '' },
 });
@@ -184,7 +187,7 @@ if (ok && frames.length > 10) {
     '-f', 'concat', '-safe', '0', '-i', path.join(work, 'frames.txt'),
     '-itsoffset', soundOffset.toFixed(3), '-i', path.join(work, 'sound.webm'),
     '-vf', 'fps=30,scale=1280:-2:flags=lanczos',
-    '-c:v', 'libx264', '-preset', 'slow', '-crf', '27', '-pix_fmt', 'yuv420p',
+    '-c:v', 'libx264', '-preset', 'slow', '-crf', '30', '-pix_fmt', 'yuv420p',
     '-c:a', 'aac', '-b:a', '128k', '-shortest', '-movflags', '+faststart',
     output,
   ]);

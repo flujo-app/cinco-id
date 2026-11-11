@@ -115,8 +115,9 @@ call, your folders and Setup.
 Everything it can load lives in **projects**. A project is a folder with a hexadecimal name, and each dancer
 ("sequence") is a folder inside it. See [docs/PROJECTS.md](docs/PROJECTS.md) for the layout.
 
-**`4d3d3d3`** is the pre-built demo project: Celery Man, Oyster, the beta sequence Tayne with his gated variant, and
-the bonus dancer Celery Head. "Kick up the 4d3d3d3" starts it.
+**`4d3d3d3`** is the pre-built demo project, dressed as in the sketch: Celery Man in his baggy silver suit, Oyster
+in the red flame cap and track jacket, the beta sequence Tayne in the black hat, sunglasses and gold-patterned shirt
+(with his gated variant), and the bonus dancer Celery Head. "Kick up the 4d3d3d3" starts it.
 
 <img src="projects/d15c0/sequences/grandmother/still.png" alt="A grandmother in a gold tracksuit" width="180" align="right">
 
@@ -282,7 +283,7 @@ The door only opens with the access token in `.local/mcp-token` in the data fold
 - The brain cannot read files or run programs. It only gets the screen tools and the outside tools you list.
 - Only one copy runs at a time. Quitting while a dancer is being made asks first.
 - The cast is invented people. No real people's faces or likenesses, and nothing explicit: the "nude" variant is a
-  lime-green mankini with the hat and boots.
+  lime-green mankini and two rubber-duck swim rings, with the hat, the sunglasses and the boots.
 
 ## Tests
 
@@ -298,7 +299,7 @@ node test/ui/print-check.mjs               # checks that a printout reaches the 
 node test/ui/clip-check.mjs "Celery Head"  # checks that a generated clip plays see-through
 node test/ui/voice-check.mjs               # LOUD on purpose: checks that the computer really speaks
 node test/ui/live-generate.mjs --yes-spend # COSTS MONEY: makes a real new dancer from inside the app
-node tools/demo/record.mjs --voice zira    # LOUD: records the demo video with the app's own sound (or --voice robot)
+node tools/demo/record.mjs --voice zira    # records the demo video with the app's own sound, without playing it out loud (or --voice robot)
 ```
 
 ## Licence
