@@ -7,9 +7,9 @@
   "stills": {
     "default": "still.png"
   },
-  "hatLine": 0.23,
+  "hatLine": 0.25,
   "provenance": {
-    "created": "2026-11-11T15:11:17Z",
+    "created": "2026-11-11T06:09:20Z",
     "models": [
       {
         "repo": "Tongyi-MAI/Z-Image-Turbo",
@@ -32,24 +32,24 @@
       }
     ],
     "prompts": {
-      "image": "Tayne in his silly beach costume: the same slim, clean-shaven man around forty, now wearing a bright lime-green sling-style one-piece comedy swimsuit with two wide straps over the shoulders, and two big puffy yellow inflatable swim rings stacked around his waist and hips, the top one with a rubber-duck head: the two thick tubes completely hide the bottom of the swimsuit and everything from the belly button down to the upper thighs, together with the same black flat-brimmed hat sitting on top of his head, the same black wrap-around sunglasses, the thin gold chain and the black leather boots. A goofy, non-sexual beach gag costume. Dance: a wide-legged groove with both arms flexed up beside the head, then a confident strut on the spot. Full-body shot of the whole person from the very top of the head (or hat) down to the shoes, standing upright and facing the camera in a relaxed ready-to-dance pose with the arms a little away from the body, centred with empty space all around, nothing cropped. Plain seamless solid light grey studio backdrop with nothing else in the picture: no props, no text, no logo. Realistic video footage of a real-looking, ordinary, invented person who is not any celebrity or real individual. Early-1990s public-access TV or corporate training tape look: slightly soft analogue video picture, warm colours, bright even studio lighting.",
-      "motion": "Tayne in his silly beach costume: the same slim, clean-shaven man around forty, now wearing a bright lime-green sling-style one-piece comedy swimsuit with two wide straps over the shoulders, and two big puffy yellow inflatable swim rings stacked around his waist and hips, the top one with a rubber-duck head: the two thick tubes completely hide the bottom of the swimsuit and everything from the belly button down to the upper thighs, together with the same black flat-brimmed hat sitting on top of his head, the same black wrap-around sunglasses, the thin gold chain and the black leather boots. A goofy, non-sexual beach gag costume. Dance: a wide-legged groove with both arms flexed up beside the head, then a confident strut on the spot. The person dances on the spot in the middle of the frame and finishes the dance back in exactly the pose they started in. The whole body stays in view from head to feet the entire time. Static locked-off camera with no zoom, no pan and no cuts. The background is a plain flat grey studio backdrop that stays perfectly even and still. Realistic early-1990s public-access TV video look. Smooth, rhythmic, slightly goofy dancing. No talking, no text.",
+      "image": "Tayne in his silly beach costume: the same flamboyant entertainer in his forties, clean-shaven, now wearing a bright lime-green sling-style one-piece comedy swimsuit with two wide straps over the shoulders, and a big puffy yellow inflatable rubber-duck swim ring worn around his hips that completely hides everything from the belly button down to the upper thighs, together with the same white boots and the same very large wide-brimmed dark navy hat sitting on top of his head. A goofy, non-sexual beach gag costume. Dance: a confident strut on the spot, swinging the hips and rolling the shoulders. Full-body shot of the whole person from the very top of the head (or hat) down to the shoes, standing upright and facing the camera in a relaxed ready-to-dance pose with the arms a little away from the body, centred with empty space all around, nothing cropped. Plain seamless solid light grey studio backdrop with nothing else in the picture: no props, no text, no logo. Realistic video footage of a real-looking, ordinary, invented person who is not any celebrity or real individual. Early-1990s public-access TV or corporate training tape look: slightly soft analogue video picture, warm colours, bright even studio lighting.",
+      "motion": "Tayne in his silly beach costume: the same flamboyant entertainer in his forties, clean-shaven, now wearing a bright lime-green sling-style one-piece comedy swimsuit with two wide straps over the shoulders, and a big puffy yellow inflatable rubber-duck swim ring worn around his hips that completely hides everything from the belly button down to the upper thighs, together with the same white boots and the same very large wide-brimmed dark navy hat sitting on top of his head. A goofy, non-sexual beach gag costume. Dance: a confident strut on the spot, swinging the hips and rolling the shoulders. The person dances on the spot in the middle of the frame and finishes the dance back in exactly the pose they started in. The whole body stays in view from head to feet the entire time. Static locked-off camera with no zoom, no pan and no cuts. The background is a plain flat blue studio backdrop that stays perfectly even and still. Realistic early-1990s public-access TV video look. Smooth, rhythmic, slightly goofy dancing. No talking, no text.",
       "negative": "camera movement, zoom in, zoom out, pan, tilt, cut, scene change, second person, crowd, text, subtitles, watermark, logo, cropped feet, cropped head, leaving the frame, blurry, distorted body, extra limbs, melting, morphing, flicker, talking"
     },
-    "costUsdEstimate": 0.27,
+    "costUsdEstimate": 0.33,
     "engine": "ltx",
-    "seed": 9003,
-    "backdropForCutout": "grey",
-    "seconds": 208,
+    "seed": 9002,
+    "backdropForCutout": "blue",
+    "seconds": 230,
     "loop": {
-      "typicalStep": 0.00514,
-      "seamBefore": 0.00242,
+      "typicalStep": 0.01125,
+      "seamBefore": 0.00679,
       "crossfadeFrames": 0,
-      "seamAfter": 0.00242,
+      "seamAfter": 0.00679,
       "frames": 96
     },
-    "clipBytes": 711358,
+    "clipBytes": 929983,
     "machineGenerated": true,
-    "note": "Beach-costume variant redrawn from the new Tayne picture (same hat, sunglasses, chain and boots). The drawing put the swim ring at the waist, so a second copy of the ring was added below it by hand (stacked rings) to hide everything from the belly button to the upper thighs; the dance was made from that picture. The rings ride up a little in fast moves, showing the plain green swimsuit bottom, nothing more. Clip cost: picture 0.03 + dance 0.24 + cut-out 0.03 US dollars (measured). hatLine set by hand to the sunglasses, just under the hat brim (brim ends at 0.212 on the still); the automatic estimate (0.372) fell at the shoulders."
+    "note": "Beach-costume variant redrawn from Tayne's picture. Clip cost: picture 0.03 + dance 0.27 + cut-out 0.04 US dollars. hatLine set by hand to the hat brim measured on the still and clip frames (0.22 to 0.26); the automatic estimate (0.277) fell at the chin."
   }
 }

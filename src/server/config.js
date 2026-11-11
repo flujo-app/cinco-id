@@ -39,6 +39,7 @@ export async function loadConfig(rootDir, overrides = {}, { dataDir = null } = {
     defaultProject: '4d3d3d3',
     maxWindows: 96,
     projectsDir: path.join(data, 'projects'),
+    musicDir: path.join(data, 'music'), // your own music: any mp3, ogg or wav put here is played instead of the built-in band
     stateDir: path.join(data, '.local'),
     setup: { onFirstStart: true }, // the Setup window opens by itself when there is no settings file yet
     gate: { repeatFirst: true },

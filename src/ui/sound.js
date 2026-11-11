@@ -1,6 +1,6 @@
-// The app's sound: beeps, the phone ring and the printer are made on the spot; the disco music
-// is three real loops in ./music (with a small band made on the spot as the fallback); and the
-// queue for the computer's voice.
+// The app's sound: beeps, the phone ring, the printer and a small disco band are made on the
+// spot; your own music files are played instead of the band if there are any; and the queue for
+// the computer's voice.
 
 let context = null;
 let master = null;
@@ -89,14 +89,12 @@ export function play(name) {
 }
 
 // ---------- disco music ----------
-// Three real disco loops, one per disco level, made with the open music model ACE-Step 1.5
-// (see music/music.json and docs/MEDIA.md). They share tempo and length, so "more disco" blends
-// into the next one in time. If they cannot be loaded or decoded, the small band below plays
-// instead, as before.
+// Your own music first: sound files in the music folder (Menu, "Music folder") are played as the
+// three disco levels, and "more disco" blends into the next one. With no files there, the small
+// band below plays, made on the spot.
 
 const TRACK_LEVEL = 1; // the loops carry their own loudness steps per level
 const SWITCH_SECONDS = 1; // the blend from one level to the next
-const MUSIC_DIR = new URL('music/', import.meta.url);
 let tracks = null; // { buffers: Map(level -> AudioBuffer), seconds } once loaded
 let trackLoad = null; // the loading, started once
 let trackError = null; // why the loops could not be used (then the band plays)
@@ -107,19 +105,20 @@ let bandStop = null;
 function loadTracks() {
   if (trackLoad) return trackLoad;
   trackLoad = (async () => {
-    const response = await fetch(new URL('music.json', MUSIC_DIR));
-    if (!response.ok) throw new Error(`music.json: HTTP ${response.status}`);
-    const list = await response.json();
-    const buffers = new Map();
-    await Promise.all([1, 2, 3].map(async level => {
-      const entry = list.tracks?.find(track => track.level === level);
-      if (!entry || !/^[\w.-]+$/.test(entry.file ?? '')) throw new Error(`no loop listed for level ${level}`);
-      const file = await fetch(new URL(entry.file, MUSIC_DIR));
-      if (!file.ok) throw new Error(`${entry.file}: HTTP ${file.status}`);
+    // Your own music: the first three sound files in the music folder, in name order, are the
+    // three disco levels (with fewer files, the last one is used for the higher levels too).
+    const response = await fetch('/api/music');
+    if (!response.ok) throw new Error(`music list: HTTP ${response.status}`);
+    const files = ((await response.json()).files ?? []).slice(0, 3);
+    if (!files.length) throw new Error('no music files in the music folder');
+    const decoded = await Promise.all(files.map(async url => {
+      const file = await fetch(url);
+      if (!file.ok) throw new Error(`${url}: HTTP ${file.status}`);
       const buffer = await audio().decodeAudioData(await file.arrayBuffer());
-      if (!(buffer.duration > 1)) throw new Error(`${entry.file} is empty`);
-      buffers.set(level, buffer);
+      if (!(buffer.duration > 1)) throw new Error(`${url} is empty`);
+      return buffer;
     }));
+    const buffers = new Map([1, 2, 3].map(level => [level, decoded[Math.min(level, decoded.length) - 1]]));
     tracks = { buffers, seconds: buffers.get(1).duration };
     return tracks;
   })().catch(error => {

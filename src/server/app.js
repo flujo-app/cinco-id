@@ -264,6 +264,13 @@ export async function createApp({ rootDir, dataDir = null, overrides = {}, env =
         if (route.startsWith('/ui/')) return serveFile(response, UI_DIR, route.slice(4), { range: request.headers.range });
         if (route.startsWith('/projects/')) return serveFile(response, config.projectsDir, route.slice(10), { mediaOnly: true, range: request.headers.range });
         if (route.startsWith('/printouts/')) return serveFile(response, config.printouts.dir, route.slice(11), { mediaOnly: true });
+        // Your own music: sound files in the music folder, in name order.
+        if (route === '/api/music') {
+          const names = await fs.readdir(config.musicDir).catch(() => []);
+          const files = names.filter(name => /\.(mp3|ogg|wav)$/i.test(name)).sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
+          return send(response, 200, { files: files.map(name => `/music/${encodeURIComponent(name)}`) });
+        }
+        if (route.startsWith('/music/')) return serveFile(response, config.musicDir, decodeURIComponent(route.slice(7)), { mediaOnly: true, range: request.headers.range });
         if (route.startsWith('/print/')) {
           // One printout laid out on a sheet of paper, for the Windows printer.
           const name = route.slice(7);
@@ -316,7 +323,7 @@ export async function createApp({ rootDir, dataDir = null, overrides = {}, env =
   function screenState() {
     return {
       ...computer.snapshot(), voice: voiceInfo(), notes,
-      folders: { data: config.dataDir, projects: config.projectsDir, printouts: config.printouts.dir },
+      folders: { data: config.dataDir, projects: config.projectsDir, printouts: config.printouts.dir, music: config.musicDir },
       setup: { firstRun },
     };
   }

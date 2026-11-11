@@ -1,13 +1,13 @@
 {
   "name": "Oyster",
   "aliases": ["oister", "oysters", "the oyster"],
-  "description": "A slim man around forty in a red skull cap with a flame pattern, an open red track jacket over a black T-shirt and a studded choker, doing goofy bent-over bouncing and head-banging. An invented person.",
+  "description": "A cheerful person in a pearl-grey satin shirt with a pearl necklace, doing a smooth happy groove. An invented person.",
   "beta": false,
-  "hatLine": 0.29,
+  "hatLine": 0.2,
   "expressions": ["smiling"],
   "puppet": {
     "rig": "humanoid",
     "dance": "twist",
-    "style": { "head": "round", "suit": "#c8202a", "shirt": "#161616", "shoes": "#141414", "skin": "#d9a47c", "gloves": "#d9a47c" }
+    "style": { "head": "round", "suit": "#cfd0d6", "shirt": "#ffffff", "shoes": "#3a2a55", "skin": "#d9a47c", "gloves": "#d9a47c" }
   }
 }

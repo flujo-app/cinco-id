@@ -1,13 +1,13 @@
 {
   "name": "Celery Man",
   "aliases": ["celery", "celeryman", "salary man", "celery men", "sellery man"],
-  "description": "A smug, clean-shaven man around forty in an oversized shiny silver-grey 1980s suit, a white shirt and a thin loosened dark-grey tie, doing cheesy showman moves: hip pops and fist pumps. An invented person.",
+  "description": "An ordinary, slightly awkward office worker in a baggy grey early-90s suit and a celery-green tie, doing an earnest office-party shuffle. An invented person.",
   "beta": false,
-  "hatLine": 0.28,
+  "hatLine": 0.2,
   "expressions": ["smiling"],
   "puppet": {
     "rig": "humanoid",
     "dance": "shuffle",
-    "style": { "head": "round", "suit": "#a7a9ad", "shirt": "#f7f6f2", "tie": "#46484e", "shoes": "#141414", "skin": "#e3b090" }
+    "style": { "head": "round", "suit": "#8d8f98", "shirt": "#f4f1e6", "tie": "#8fc455", "shoes": "#2a2320", "skin": "#e8b796" }
   }
 }
