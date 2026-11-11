@@ -8,10 +8,11 @@ import { randomBytes } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadConfig } from '../config.js';
+import { loadConfig, settingsFile } from '../config.js';
 
 const rootDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-const file = path.join(rootDir, 'harness.config.json');
+const dataDir = process.env.CINCO_ID_DATA_DIR ? path.resolve(process.env.CINCO_ID_DATA_DIR) : rootDir;
+const file = settingsFile(dataDir) ?? path.join(dataDir, 'harness.config.json');
 const show = process.argv.includes('--show');
 
 let saved = {};
@@ -25,7 +26,7 @@ if (!/^whsec_/.test(saved.events.whatsapp.secret ?? '') || /</.test(saved.events
   await fs.writeFile(file, JSON.stringify(saved, null, 2) + '\n');
   created = true;
 }
-const config = await loadConfig(rootDir);
+const config = await loadConfig(rootDir, {}, { dataDir });
 const secret = saved.events.whatsapp.secret;
 
 console.log(created ? 'A new private secret was saved in harness.config.json.' : 'Using the secret already saved in harness.config.json.');

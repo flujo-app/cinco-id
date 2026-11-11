@@ -1,29 +1,28 @@
 // Checks that generated clips really play in the app with a see-through background.
-// Usage: node test/ui/clip-check.mjs [--projects <folder>] [--shots <folder>] "<sequence name>" ...
+// Usage: node test/ui/clip-check.mjs [--projects <folder>] [--shots <folder>] [--exe <packaged CINCO ID.exe>] "<sequence name>" ...
 // A name may be followed by "/variant", for example "Tayne/nude".
+// Without --projects, the copy starts with an empty data folder and plays the demo project that
+// it copies there on the first start.
 import { _electron as electron } from 'playwright-core';
 import os from 'node:os';
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { launchOptions, takeOption } from './launch.mjs';
+import { leftSwitchedOff, windows } from './desktop.mjs';
 
-const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const args = process.argv.slice(2);
-const take = flag => { const at = args.indexOf(flag); return at >= 0 ? args.splice(at, 2)[1] : null; };
-const projects = take('--projects');
-const shots = take('--shots');
+const projects = takeOption(args, '--projects');
+const shots = takeOption(args, '--shots');
+const exe = takeOption(args, '--exe');
 const names = args;
 if (!names.length) { console.error('Give at least one sequence name.'); process.exit(2); }
 const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'cinco-id-clip-'));
+const before = windows();
 
-const app = await electron.launch({
-  args: ['.', '--port=19784', '--silent', '--no-tray', '--no-print'],
-  cwd: root,
-  env: {
-    ...process.env, CINCO_ID_CONFIG: 'none', CINCO_ID_OPERATOR: 'Paul', CINCO_ID_STATE_DIR: path.join(temp, 'state'),
-    CINCO_ID_PRINTOUTS_DIR: path.join(temp, 'printouts'), ...(projects ? { CINCO_ID_PROJECTS_DIR: projects } : {}),
-  },
-});
+const app = await electron.launch(launchOptions({
+  exe, port: 19784, dataDir: path.join(temp, 'data'),
+  env: { CINCO_ID_CONFIG: 'none', CINCO_ID_OPERATOR: 'Paul', ...(projects ? { CINCO_ID_PROJECTS_DIR: path.resolve(projects) } : {}) },
+}));
 let failed = false;
 try {
   const page = await app.firstWindow();
@@ -71,4 +70,5 @@ try {
   await app.close().catch(() => {});
   await fs.rm(temp, { recursive: true, force: true }).catch(() => {});
 }
+for (const problem of leftSwitchedOff(before)) { console.error(`Problem: ${problem}`); failed = true; }
 process.exitCode = failed ? 1 : 0;

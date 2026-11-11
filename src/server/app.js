@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { handleMcp } from './mcp-endpoint.js';
 import { WebSocketServer } from 'ws';
 import { loadConfig } from './config.js';
+import { seedProjects } from './paths.js';
 import { Library } from './projects.js';
 import { Computer } from './computer.js';
 import { createBrain } from './brain.js';
@@ -83,8 +84,13 @@ async function serveFile(response, root, relative, { mediaOnly = false } = {}) {
  * Puts the whole thing together: projects, the computer, voice, brain, outside tools and the
  * small local web server the screen talks to. Only this machine can reach it.
  */
-export async function createApp({ rootDir, overrides = {}, env = process.env, parts = {} } = {}) {
-  const config = await loadConfig(rootDir, overrides);
+export async function createApp({ rootDir, dataDir = null, overrides = {}, env = process.env, parts = {} } = {}) {
+  const config = await loadConfig(rootDir, overrides, { dataDir });
+  // An installed copy starts with the bundled demo project in its own data folder, so people can
+  // add theirs next to it. A clone already has it in place.
+  const seeded = config.projectsDir === path.join(config.dataDir, 'projects')
+    ? await seedProjects(config.bundledProjectsDir, config.projectsDir).catch(() => [])
+    : [];
   const library = await new Library(config.projectsDir).reload();
   const notes = [];
   const connectors = parts.connectors ?? await new Connectors(config.mcpServers, {
@@ -94,7 +100,7 @@ export async function createApp({ rootDir, overrides = {}, env = process.env, pa
   let port = config.port;
   // Two keys to the /mcp door: one for the computer's own brain (new on every start), and one
   // for outside agents you connect yourself (kept in the state folder so it stays the same).
-  const speaker = parts.speaker ?? new Speaker(config.voice.tts, path.join(rootDir, '.cache', 'tts'));
+  const speaker = parts.speaker ?? new Speaker(config.voice.tts, path.join(config.cacheDir, 'tts'));
   const brainToken = randomBytes(24).toString('hex');
   const guestToken = config.mcp?.token ?? await keptToken(path.join(config.stateDir, 'mcp-token'));
   const computer = new Computer({
@@ -192,7 +198,7 @@ export async function createApp({ rootDir, overrides = {}, env = process.env, pa
             + '<style>@page{size:A4;margin:12mm}html,body{margin:0;background:#fff}img{display:block;margin:0 auto;max-width:100%;max-height:270mm}</style>'
             + `</head><body><img src="/printouts/${encodeURIComponent(name)}" alt=""></body></html>`, { 'content-type': 'text/html; charset=utf-8' });
         }
-        if (route === '/api/state') return send(response, 200, { ...computer.snapshot(), voice: voiceInfo(), notes });
+        if (route === '/api/state') return send(response, 200, screenState());
         if (route === '/api/tts') {
           const file = await speaker.speak(url.searchParams.get('text') ?? '').catch(error => { notes.push(`Voice: ${error.message}`); return null; });
           if (!file) return send(response, 204, '');
@@ -229,6 +235,14 @@ export async function createApp({ rootDir, overrides = {}, env = process.env, pa
     return { speak: speaker.serverSide ? 'server' : 'browser', listen: listener.available };
   }
 
+  /** Everything the screen needs when it (re)connects. */
+  function screenState() {
+    return {
+      ...computer.snapshot(), voice: voiceInfo(), notes,
+      folders: { data: config.dataDir, projects: config.projectsDir, printouts: config.printouts.dir },
+    };
+  }
+
   const wss = new WebSocketServer({ noServer: true });
   server.on('upgrade', (request, socket, head) => {
     if (new URL(request.url, 'http://127.0.0.1').pathname !== '/ws' || fromElsewhere(request)) return socket.destroy();
@@ -236,7 +250,7 @@ export async function createApp({ rootDir, overrides = {}, env = process.env, pa
   });
   wss.on('connection', socket => {
     sockets.add(socket);
-    socket.send(JSON.stringify({ ...computer.snapshot(), voice: voiceInfo(), notes }));
+    socket.send(JSON.stringify(screenState()));
     socket.on('close', () => sockets.delete(socket));
     socket.on('message', async raw => {
       let message;
@@ -255,7 +269,7 @@ export async function createApp({ rootDir, overrides = {}, env = process.env, pa
   });
 
   return {
-    config, computer, library, server, speaker, listener, connectors, notes, guestToken,
+    config, computer, library, server, speaker, listener, connectors, notes, guestToken, seeded,
     async listen() {
       await new Promise((resolve, reject) => {
         server.once('error', reject);

@@ -13,6 +13,7 @@ window.betaSequence = { clipStatus, voiceLog: sound.voiceLog }; // for the check
 let socket = null;
 let operator = 'Operator';
 let voice = { speak: 'server', listen: false };
+let folders = {};
 let greeted = false;
 let musicChoice = 'auto'; // "auto": on while anything dances
 let muted = query.has('silent');
@@ -278,6 +279,7 @@ function handle(action) {
     case 'snapshot': {
       operator = action.operator;
       voice = action.voice ?? voice;
+      folders = action.folders ?? folders;
       sound.setVoiceMode(voice.speak);
       wm.closeAll(record => record.desc.kind !== 'console');
       for (const window of action.windows) wm.open(window, { instant: true });
@@ -444,7 +446,19 @@ startMenu.addEventListener('click', event => {
   else if (action === 'music') { musicChoice = sound.isMusicOn() ? 'off' : 'on'; updateMusic(); }
   else if (action === 'test-call') command('test call');
   else if (action === 'clear') command('clear the desktop');
+  else if (action?.startsWith('folder-')) openFolder(action.slice(7));
 });
+
+/** Opens the projects or printouts folder in Windows. In a plain browser it shows where it is. */
+async function openFolder(which) {
+  const where = folders[which];
+  if (shell?.openFolder) {
+    const problem = await shell.openFolder(which).catch(error => error.message);
+    if (problem) logLine('system', `Could not open the folder: ${problem}`);
+    return;
+  }
+  wm.open({ id: `folder-${which}-${Date.now()}`, kind: 'note', title: which === 'projects' ? 'Projects folder' : 'Printouts folder', text: where ?? 'Unknown.' }, { instant: true });
+}
 
 const micTray = document.getElementById('tray-mic');
 micTray.addEventListener('pointerdown', event => { event.preventDefault(); startListening(); });

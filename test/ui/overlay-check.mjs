@@ -2,18 +2,20 @@
 //  1. with dancers up, takes one picture of the whole screen (to look at by eye),
 //  2. confirms that empty areas let clicks through to whatever is behind,
 //  3. confirms that the layer catches clicks again when the pointer is over one of its windows.
-// Usage: node test/ui/overlay-check.mjs <folder for the picture>
+// Usage: node test/ui/overlay-check.mjs [<folder for the picture>] [--exe <packaged CINCO ID.exe>]
 import { _electron as electron } from 'playwright-core';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { launchOptions, takeOption } from './launch.mjs';
 
-const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const shots = process.argv[2];
+const args = process.argv.slice(2);
+const exe = takeOption(args, '--exe');
+const shots = args.find(arg => !arg.startsWith('--')) ?? null;
 const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'cinco-id-overlay-'));
+const OUR_PROGRAMS = new Set(['electron', 'cinco id']);
 
 function powershell(script) {
   return execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { encoding: 'utf8' }).trim();
@@ -37,11 +39,10 @@ function programAt(x, y) {
     (Get-Process -Id $pid2).ProcessName`);
 }
 
-const app = await electron.launch({
-  args: ['.', '--port=19783', '--silent', '--no-tray', '--no-print', '--overlay'],
-  cwd: root,
-  env: { ...process.env, CINCO_ID_CONFIG: 'none', CINCO_ID_OPERATOR: 'Paul', CINCO_ID_STATE_DIR: path.join(temp, 'state'), CINCO_ID_PRINTOUTS_DIR: path.join(temp, 'printouts') },
-});
+const app = await electron.launch(launchOptions({
+  exe, port: 19783, dataDir: path.join(temp, 'data'), args: ['--overlay'],
+  env: { CINCO_ID_CONFIG: 'none', CINCO_ID_OPERATOR: 'Paul' },
+}));
 try {
   const page = await app.firstWindow();
   await page.waitForSelector('.console-log');
@@ -75,14 +76,14 @@ try {
   // An empty spot (top right, far from the console window).
   const emptyOwner = programAt(...toScreen(info.width - 60, 60));
   console.log(`A click on an empty part would go to: ${emptyOwner}`);
-  assert.notEqual(emptyOwner.toLowerCase(), 'electron', 'empty areas let clicks through');
+  assert.ok(!OUR_PROGRAMS.has(emptyOwner.toLowerCase()), 'empty areas let clicks through');
 
   // Pointer over one of our windows: the layer must take clicks again.
   await page.evaluate(() => window.shell.setIgnoreMouse(false));
   await page.waitForTimeout(300);
   const consoleOwner = programAt(...toScreen(info.console.x, info.console.y));
   console.log(`A click on the console window would go to: ${consoleOwner}`);
-  assert.equal(consoleOwner.toLowerCase(), 'electron', 'our own windows take clicks');
+  assert.ok(OUR_PROGRAMS.has(consoleOwner.toLowerCase()), 'our own windows take clicks');
   await page.evaluate(() => window.shell.setIgnoreMouse(true));
   console.log('Overlay check passed.');
 } catch (error) {
