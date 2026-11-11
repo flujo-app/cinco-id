@@ -1,7 +1,8 @@
 import { WindowManager } from './wm.js';
-import { Stage, SequenceView, renderStill, clipStatus } from './stage.js';
+import { Stage, SequenceView, renderPortrait, clipStatus } from './stage.js';
 import * as sound from './sound.js';
 import { buildSetup } from './setup.js';
+import { drawBanner, drawHeadIcon, drawLed, drawPhone, fitBlockText } from './pixels.js';
 
 const shell = window.shell ?? null; // present when running inside the desktop shell
 const query = new URLSearchParams(location.search);
@@ -33,12 +34,6 @@ function el(tag, className, text) {
   return node;
 }
 
-function hash(text) {
-  let h = 0;
-  for (const ch of String(text)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return h;
-}
-
 // ---------- what goes inside each kind of window ----------
 
 const builders = {
@@ -46,9 +41,9 @@ const builders = {
     const canvas = el('canvas');
     canvas.width = record.bodyW;
     canvas.height = record.bodyH;
-    record.body.classList.add(`seq-bg-${hash(desc.sequence.key) % 5}`);
+    record.body.classList.add(`backdrop-${desc.backdrop ?? 'white'}`);
     record.body.append(canvas);
-    const view = new SequenceView(canvas, desc.sequence, { effects: desc.effects, phase: desc.phase ?? 0 });
+    const view = new SequenceView(canvas, desc.sequence, { effects: desc.effects, phase: desc.phase ?? 0, shot: desc.shot ?? 'full' });
     record.view = view;
     stage.add(view);
     record.cleanup = () => stage.remove(view);
@@ -73,19 +68,32 @@ const builders = {
   call(record, desc, wm) {
     const call = desc.call;
     const contact = call.contact ?? {};
-    const row = el('div', 'call-row');
-    const info = el('div');
-    info.append(
-      el('div', 'call-name', call.caller),
-      el('div', 'call-number', contact.number ? `+${contact.number}` : 'Number withheld'),
-      el('div', 'call-kind', [
-        call.isVideo ? 'WhatsApp video call' : 'WhatsApp voice call',
-        call.isGroup ? 'group call' : null,
-        contact.isMyContact ? 'saved contact' : 'not in your contacts',
-        contact.pushname && contact.pushname !== call.caller ? `shows as "${contact.pushname}"` : null,
-      ].filter(Boolean).join(' · ')),
-    );
-    row.append(el('div', 'icon icon-phone'), info);
+    const number = contact.number ? `+${contact.number}` : 'Number withheld';
+    // As in the sketch: the number on a red display, then a big panel with a ringing phone and
+    // the caller's name in chunky letters.
+    const led = el('div', 'call-led');
+    const digits = el('canvas');
+    digits.width = 440;
+    digits.height = 68;
+    drawLed(digits, contact.number ? number : '');
+    led.append(digits, el('div', 'call-number sr-only', number));
+    const panel = el('div', 'call-panel');
+    const letters = el('canvas', 'call-letters');
+    letters.width = 424;
+    letters.height = 92;
+    const fits = fitBlockText(letters.getContext('2d'), call.caller, { x: 4, y: 4, width: 416, height: 84 }, { color: '#fff', maxLines: 2, tall: 1.2, minCell: 3 });
+    // A name too long for chunky letters is shown in ordinary ones.
+    const phone = el('canvas', 'call-phone');
+    phone.width = 168;
+    phone.height = 168;
+    drawPhone(phone);
+    panel.append(phone, fits ? letters : el('div', 'call-plain', call.caller), el('div', 'call-name sr-only', call.caller));
+    const kind = el('div', 'call-kind', [
+      call.isVideo ? 'WhatsApp video call' : 'WhatsApp voice call',
+      call.isGroup ? 'group call' : null,
+      contact.isMyContact ? 'saved contact' : 'not in your contacts',
+      contact.pushname && contact.pushname !== call.caller ? `shows as "${contact.pushname}"` : null,
+    ].filter(Boolean).join(' · '));
     const buttons = el('div', 'button-row');
     const decline = el('button', 'w95', 'Decline');
     record.setCanDecline = can => {
@@ -99,7 +107,7 @@ const builders = {
     const accept = el('button', 'w95', 'Accept');
     accept.addEventListener('click', () => send({ type: 'call.accept', callId: call.callId }));
     buttons.append(accept, decline, dismiss);
-    record.body.append(row, buttons);
+    record.body.append(led, panel, kind, buttons);
     record.cleanup = () => setTimeout(stopRingIfQuiet, 0);
   },
 
@@ -108,17 +116,69 @@ const builders = {
   },
 
   progress(record, desc) {
+    // As in the sketch: a white bar filling with blue blocks, the words underneath.
     const label = el('div', 'pad', desc.text ?? '');
     const track = el('div', 'progress-track sunken busy');
     for (let i = 0; i < 8; i++) track.append(el('i'));
-    record.body.append(label, track);
+    record.body.append(track, label);
+    const BLOCKS = 18;
     record.setProgress = (value, text) => {
       if (text) label.textContent = text;
       if (typeof value !== 'number') return;
       track.classList.remove('busy');
-      const blocks = Math.round(Math.max(0, Math.min(1, value)) * 24);
-      track.replaceChildren(...Array.from({ length: blocks }, () => el('i')));
+      const blocks = Math.round(Math.max(0, Math.min(1, value)) * BLOCKS);
+      if (track.childElementCount !== blocks) track.replaceChildren(...Array.from({ length: blocks }, () => el('i')));
     };
+    if (desc.fill) fillBar(record.setProgress, desc.fill);
+  },
+
+  /** The start window: the banner with the grid head and "please wait...". Closes by itself. */
+  splash(record, desc, wm) {
+    const banner = el('canvas', 'banner');
+    banner.width = 470 * 2;
+    banner.height = 176 * 2;
+    drawBanner(banner);
+    const track = el('div', 'progress-track sunken');
+    record.body.append(banner, el('div', 'splash-title', 'Cinco Identity Generator 2.5'), track, el('div', 'wait-text', 'please wait...'));
+    fillBar(value => {
+      const blocks = Math.round(value * 20);
+      if (track.childElementCount !== blocks) track.replaceChildren(...Array.from({ length: blocks }, () => el('i')));
+    }, desc.fill ?? 2600);
+    setTimeout(() => wm.close(desc.id), (desc.fill ?? 2600) + 500);
+  },
+
+  /** "Please choose a sequence": a picture of every dancer; a click loads it. */
+  chooser(record, desc, wm) {
+    const banner = el('canvas', 'banner');
+    banner.width = 470 * 2;
+    banner.height = 120 * 2;
+    drawBanner(banner);
+    record.body.append(banner, el('div', 'chooser-ask', 'Please choose a sequence:'));
+    const many = desc.projects.length > 1;
+    for (const project of desc.projects) {
+      if (many) record.body.append(el('div', 'chooser-project', `${project.id} - ${project.name}`));
+      const row = el('div', 'chooser-row');
+      for (const entry of project.sequences) {
+        const tile = el('button', 'chooser-tile');
+        if (entry.hidden) {
+          tile.append(el('span', 'chooser-face mystery', '?'), el('span', '', 'BETA'));
+          tile.addEventListener('click', () => { sound.unlock(); wm.close(desc.id, { byHand: true }); command('do we have any new sequences?'); });
+        } else {
+          const face = el('canvas', 'chooser-face');
+          face.width = 128;
+          face.height = 128;
+          renderPortrait(entry.sequence, null, 128, 128, { crop: 0.3 }).then(picture => face.getContext('2d').drawImage(picture, 0, 0)).catch(() => {});
+          const name = el('span', '', entry.name);
+          if (entry.beta) name.append(el('span', 'chooser-beta', '(BETA)'));
+          tile.append(face, name);
+          tile.addEventListener('click', () => { sound.unlock(); wm.close(desc.id, { byHand: true }); command(`load up ${entry.name}`); });
+        }
+        row.append(tile);
+      }
+      if (!project.sequences.length) row.append(el('div', 'chooser-project', 'no sequences yet'));
+      record.body.append(row);
+    }
+    if (desc.footnote) record.body.append(el('div', 'chooser-foot', desc.footnote));
   },
 
   printout(record, desc) {
@@ -191,43 +251,37 @@ const builders = {
 
 // ---------- printouts ----------
 
-const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
-
+/** The page as in the sketch: a head-and-shoulders photo on white paper, a small caption under it. */
 async function printPage(paper, desc) {
   const ctx = paper.getContext('2d');
   ctx.fillStyle = '#fff';
   ctx.fillRect(0, 0, paper.width, paper.height);
-  const still = await renderStill(desc.sequence, desc.expression, 2);
-  const k = Math.min(520 / still.width, 560 / still.height);
-  ctx.drawImage(still, (paper.width - still.width * k) / 2, 96, still.width * k, still.height * k);
+  const photo = { x: 50, y: 120, width: 500, height: 375 };
+  const wall = ctx.createLinearGradient(0, photo.y, 0, photo.y + photo.height);
+  wall.addColorStop(0, '#f4f4f2');
+  wall.addColorStop(1, '#e6e6e3');
+  ctx.fillStyle = wall;
+  ctx.fillRect(photo.x, photo.y, photo.width, photo.height);
+  const picture = await renderPortrait(desc.sequence, desc.expression, photo.width * 2, photo.height * 2, { crop: 0.36 });
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(picture, photo.x, photo.y, photo.width, photo.height);
 
-  // The cheap colour-printer look: few ink levels, ordered dots.
-  const image = ctx.getImageData(0, 0, paper.width, paper.height);
-  const data = image.data;
-  for (let y = 0; y < paper.height; y++) {
-    for (let x = 0; x < paper.width; x++) {
-      const i = (y * paper.width + x) * 4;
-      const threshold = (BAYER[(y & 3) * 4 + (x & 3)] + 0.5) / 16 - 0.5;
-      for (let c = 0; c < 3; c++) {
-        const level = Math.round(data[i + c] / 255 * 5 + threshold * 0.7);
-        data[i + c] = Math.max(0, Math.min(5, level)) * 51;
-      }
-    }
-  }
-  ctx.putImageData(image, 0, 0);
+  ctx.fillStyle = '#333';
+  ctx.textAlign = 'center';
+  ctx.font = '15px Arial, Helvetica, sans-serif';
+  ctx.fillText(desc.caption.replace(/,/g, '').toLowerCase(), paper.width / 2, photo.y + photo.height + 34);
+  ctx.textAlign = 'left';
+}
 
-  ctx.fillStyle = '#000';
-  ctx.font = 'bold 26px "Courier New", monospace';
-  ctx.fillText('PRINTOUT', 40, 56);
-  ctx.font = '15px "Courier New", monospace';
-  ctx.fillText(new Date().toLocaleString('en-GB'), 40, 80);
-  ctx.fillRect(40, 90, 520, 2);
-  ctx.fillRect(40, 676, 520, 2);
-  ctx.font = 'bold 22px "Courier New", monospace';
-  ctx.fillText(desc.caption.toUpperCase(), 40, 708);
-  ctx.font = '14px "Courier New", monospace';
-  ctx.fillText(`SEQUENCE ${desc.sequence.key}${desc.sequence.variant ? ` / ${desc.sequence.variant}` : ''}`, 40, 732);
-  ctx.fillText(`PRINTED FOR ${operator.toUpperCase()}`, 40, 752);
+/** Fills a "please wait" bar from empty to full over `ms`. */
+function fillBar(set, ms) {
+  const start = performance.now();
+  const tick = now => {
+    const value = Math.min(1, (now - start) / ms);
+    set(value);
+    if (value < 1) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
 }
 
 // ---------- the desktop ----------
@@ -236,7 +290,9 @@ const wm = new WindowManager({
   desktop: document.getElementById('desktop'),
   tasks: document.getElementById('tasks'),
   builders,
-  onClosed: (id, desc) => { if (desc.kind !== 'console' && desc.kind !== 'setup') send({ type: 'window.closed', id }); updateMusic(); },
+  onClosed: (id, desc) => { if (!['console', 'setup', 'splash'].includes(desc.kind)) send({ type: 'window.closed', id }); updateMusic(); },
+  // While a call rings the rest of the screen goes pale, as in the sketch.
+  onChanged: () => document.body.classList.toggle('ringing', [...wm.windows.values()].some(record => record.desc.kind === 'call')),
 });
 
 // ---------- the Setup window ----------
@@ -260,23 +316,106 @@ async function setupClosed(firstRun, saved) {
     await fetch('/api/settings', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ announce: false }) }).catch(() => {});
   }
   setupPending = false;
-  if (!greeted) { greeted = true; send({ type: 'hello' }); }
+  startUp();
 }
+
+const consoleTitle = () => `${operator}'s COMPUTER`;
 
 function showConsole() {
   const existing = wm.windows.get('console');
   if (existing) { wm.minimise(existing, false); return; }
-  wm.open({ id: 'console', kind: 'console', title: 'Computer' }, { instant: true });
+  wm.open({ id: 'console', kind: 'console', title: consoleTitle() }, { instant: true });
   for (const line of pendingLines.splice(0)) logLine(line.who, line.text);
   consoleUi.input?.focus();
 }
 
 const pendingLines = [];
-function logLine(who, text) {
+let finishTyping = null; // lets the line being typed appear at once when the next one arrives
+
+/**
+ * Adds a line to the computer's window. With `typed` it appears letter by letter behind a block
+ * cursor, as in the sketch. The whole text is in the page from the start (the part not typed yet
+ * is just invisible), so nothing jumps and the line can be read back at any moment.
+ * `breaks` are places in the text after which a new line starts (the big beta offer).
+ */
+function logLine(who, text, { typed = false, breaks = [] } = {}) {
   if (!consoleUi.log?.isConnected) { pendingLines.push({ who, text }); return; }
-  const line = el('div', who, text);
+  finishTyping?.();
+  const line = el('div', who);
+  const done = el('span', 'typed');
+  const cursor = el('i', 'cursor');
+  const rest = el('span', 'untyped');
+  line.append(done, cursor, rest);
+  const put = (node, from, to) => {
+    const parts = [];
+    let at = from;
+    for (const stop of breaks) {
+      if (stop <= 0 || stop < from || stop >= to) continue;
+      if (stop > at) parts.push(text.slice(at, stop));
+      parts.push(document.createElement('br'));
+      at = stop;
+    }
+    parts.push(text.slice(at, to));
+    node.replaceChildren(...parts);
+  };
+  const show = count => { put(done, 0, count); put(rest, count, text.length); };
   consoleUi.log.append(line);
   while (consoleUi.log.childElementCount > 300) consoleUi.log.firstElementChild.remove();
+  if (!typed) { show(text.length); consoleUi.log.scrollTop = consoleUi.log.scrollHeight; return; }
+  const perSecond = who === 'operator' ? 120 : Math.max(34, text.length / 3.5); // long answers do not dawdle
+  const start = performance.now();
+  let stopped = false;
+  finishTyping = () => { stopped = true; finishTyping = null; show(text.length); };
+  const tick = now => {
+    if (stopped) return;
+    const count = Math.min(text.length, Math.floor((now - start) / 1000 * perSecond) + 1);
+    show(count);
+    consoleUi.log.scrollTop = consoleUi.log.scrollHeight;
+    if (count < text.length) requestAnimationFrame(tick);
+    else finishTyping = null;
+  };
+  show(0);
+  consoleUi.log.scrollTop = consoleUi.log.scrollHeight;
+  requestAnimationFrame(tick);
+}
+
+/** Where a spoken text is broken into lines for the big window: at sentence ends, and a long first sentence in the middle. */
+function bigBreaks(text) {
+  const breaks = [];
+  const sentences = text.match(/[^.!?]+[.!?]+\s*/g) ?? [text];
+  let at = 0;
+  sentences.forEach((sentence, index) => {
+    if (sentence.trim().length > 30) {
+      const middle = at + sentence.trim().length / 2;
+      let best = -1;
+      for (let i = at + 1; i < at + sentence.length - 1; i++) {
+        if (text[i] === ' ' && (best < 0 || Math.abs(i - middle) < Math.abs(best - middle))) best = i;
+      }
+      if (best > 0) breaks.push(best + 1);
+    }
+    at += sentence.length;
+    if (index < sentences.length - 1) breaks.push(at);
+  });
+  return breaks;
+}
+
+/** The computer's window steps to the middle and speaks in big letters (the beta offer), then goes back. */
+let consoleHome = null;
+function consoleBig(on) {
+  const record = wm.windows.get('console');
+  if (!record || record.maximised || overlay || on === Boolean(consoleHome)) return;
+  if (on) {
+    consoleHome = [record.x, record.y];
+    record.frame.classList.add('big');
+    const { width, height } = wm.bounds();
+    record.x = Math.max(0, (width - record.frame.offsetWidth) / 2);
+    record.y = Math.max(0, height * 0.42 - record.frame.offsetHeight / 2);
+  } else {
+    record.frame.classList.remove('big');
+    [record.x, record.y] = consoleHome;
+    consoleHome = null;
+  }
+  wm.position(record);
   consoleUi.log.scrollTop = consoleUi.log.scrollHeight;
 }
 
@@ -299,15 +438,33 @@ function stopRingIfQuiet() {
   if (![...wm.windows.values()].some(record => record.desc.kind === 'call')) sound.play('ring-stop');
 }
 
+/** The very start, as in the sketch: the start window with "please wait...", and the greeting. */
+function startUp() {
+  if (greeted) return;
+  greeted = true;
+  if (overlay) { send({ type: 'hello' }); return; }
+  wm.open({ id: 'splash', kind: 'splash', title: 'Cinco Identity Generator 2.5', fill: 2600 }, { instant: true });
+  setTimeout(() => send({ type: 'hello' }), 1500);
+}
+
 function drawIcons(projects) {
   const icons = document.getElementById('icons');
   icons.replaceChildren();
   const add = (art, label, action) => {
     const button = el('button', 'desktop-icon');
-    button.append(el('div', `icon-art ${art}`), el('span', '', label));
+    const picture = el('div', `icon-art ${art}`);
+    if (art === 'head') {
+      const canvas = el('canvas');
+      canvas.width = 52;
+      canvas.height = 56;
+      drawHeadIcon(canvas);
+      picture.append(canvas);
+    }
+    button.append(picture, el('span', '', label));
     button.addEventListener('dblclick', action);
     icons.append(button);
   };
+  add('head', 'Cinco 2.5', () => { sound.unlock(); command('choose a sequence'); });
   add('machine', 'Computer', showConsole);
   for (const project of projects ?? []) add('folder', project.id, () => { sound.unlock(); command(`kick up the ${project.id}`); });
 }
@@ -325,6 +482,7 @@ function handle(action) {
       for (const window of action.windows) wm.open(window, { instant: true });
       drawIcons(action.projects);
       showConsole();
+      wm.setTitle('console', consoleTitle());
       if (consoleUi.log) {
         consoleUi.log.replaceChildren();
         for (const line of action.log ?? []) logLine(line.who, line.text);
@@ -338,7 +496,7 @@ function handle(action) {
         setupPending = true;
         showSetup({ firstRun: true });
       }
-      if (!greeted && !setupPending) { greeted = true; send({ type: 'hello' }); }
+      if (!setupPending) startUp();
       break;
     }
     case 'setup.open':
@@ -358,13 +516,18 @@ function handle(action) {
       operator = action.operator ?? operator;
       voice = action.voice ?? voice;
       sound.setVoiceMode(voice.speak);
+      wm.setTitle('console', consoleTitle());
       break;
-    case 'say':
-      logLine('computer', action.text);
+    case 'say': {
+      const big = action.key === 'betaOffer';
+      consoleBig(big);
+      logLine('computer', action.text, { typed: true, breaks: big ? bigBreaks(action.text) : [] });
       sound.say(action.speak ?? action.text);
       break;
+    }
     case 'heard':
-      logLine('operator', action.text);
+      consoleBig(false);
+      logLine('operator', action.text, { typed: true });
       break;
     case 'window.open':
       wm.open(action.window);
@@ -504,7 +667,7 @@ startMenu.addEventListener('click', event => {
   const action = event.target.closest('button')?.dataset.action;
   sound.unlock();
   if (action === 'console') showConsole();
-  else if (action === 'index') command('list everything');
+  else if (action === 'index') command('choose a sequence');
   else if (action === 'music') { musicChoice = sound.isMusicOn() ? 'off' : 'on'; updateMusic(); }
   else if (action === 'test-call') command('test call');
   else if (action === 'clear') command('clear the desktop');
@@ -535,12 +698,6 @@ muteTray.addEventListener('click', () => {
   sound.setMuted(muted);
   updateMusic();
 });
-
-function tickClock() {
-  document.getElementById('clock').textContent = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-}
-tickClock();
-setInterval(tickClock, 10_000);
 
 addEventListener('pointerdown', () => sound.unlock(), { once: true });
 

@@ -85,6 +85,10 @@ export function parseCommand(text, world) {
     return { intent: 'list', what: m[1] };
   }
   if (/^what (?:do we|have we|can you|do you) (?:have|got|do|load)/.test(said) || said === 'help') return { intent: 'list', what: 'everything' };
+  // "Choose a sequence": the window with a picture of every dancer.
+  if (/^(?:(?:choose|pick|select|show|show me) (?:a |the |me the )?(?:sequence|sequences|menu|index)|index|menu|list everything|everything)$/.test(said)) {
+    return { intent: 'list', what: 'everything' };
+  }
 
   // The Setup window, also straight to its WhatsApp page ("link whatsapp")
   if (/^(?:(?:please )?(?:link|connect|pair|set up|setup|hook up|add)(?: up)?(?: to)?(?: my| the)? (?:whats ?app|what s app)(?: account| to (?:the |this )?computer)?|(?:whats ?app|what s app) (?:link|linking|setup|set up|settings))$/.test(said.replace(ASK, ''))) {

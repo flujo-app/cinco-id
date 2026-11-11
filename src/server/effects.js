@@ -26,6 +26,9 @@ export const EFFECTS = {
   drift: { say: ['drift', 'wander', 'float', 'roam'], scope: 'window', wild: true },
   conga: { say: ['conga', 'conga line', 'parade', 'orbit'], scope: 'window', wild: true },
   free: { say: ['free', 'set free', 'no window', 'no windows', 'no frame', 'frameless', 'loose', 'out of the window'], scope: 'window' },
+  // A number from the sketch. It is staged by the computer (the dancer steps out of the window, with
+  // close-ups beside it), so the screen draws nothing special for it.
+  flarhgunnstow: { say: ['flarhgunnstow', 'flarhgunstow', 'flargunnstow', 'flargunstow', 'flar gun stow', 'flarhgunnstowe', 'flagunstow'], stage: 'solo' },
 };
 
 export const EFFECT_NAMES = Object.keys(EFFECTS);
@@ -42,12 +45,14 @@ export function isClearEffects(text) {
 export function findEffect(text, learned = {}) {
   const wanted = normalize(text);
   if (!wanted) return null;
+  for (const [name, effect] of Object.entries(EFFECTS)) {
+    if (name.toLowerCase() === wanted || effect.say.includes(wanted)) return name;
+  }
   if (learned[squash(wanted)]) return squash(wanted);
   let best = null;
   let bestRatio = 0.21; // only very close spellings count; made-up words must stay made-up
   for (const [name, effect] of Object.entries(EFFECTS)) {
     for (const phrase of [name.toLowerCase(), ...effect.say]) {
-      if (phrase === wanted) return name;
       const ratio = editDistance(squash(wanted), squash(phrase)) / Math.max(wanted.length, phrase.length);
       if (ratio < bestRatio) { best = name; bestRatio = ratio; }
     }
@@ -74,7 +79,7 @@ export function improviseEffect(word) {
 
 /** Expands an effect name (known or learned) into the list the screen should apply. */
 export function expandEffect(name, learned = {}, amount = 1) {
-  if (EFFECTS[name]) return [{ effect: name, amount }];
+  if (EFFECTS[name]) return EFFECTS[name].stage ? [] : [{ effect: name, amount }];
   const custom = learned[name];
   if (custom) return custom.recipe.map(step => ({ effect: step.effect, amount: step.amount * amount }));
   return [];
@@ -88,9 +93,11 @@ export function showVariation(index, seed, baseEffects = []) {
   if (random() < 0.3) effects.push({ effect: 'rainbow', amount: Number((0.3 + random() * 0.7).toFixed(2)) });
   if (random() < 0.18) effects.push({ effect: 'fast', amount: 1 });
   if (random() < 0.12) effects.push({ effect: 'ghost', amount: 1 });
-  return {
-    effects,
-    size: ['small', 'small', 'medium', 'medium', 'large'][Math.floor(random() * 5)],
-    phase: Number(random().toFixed(3)),
-  };
+  const size = ['small', 'small', 'medium', 'medium', 'large'][Math.floor(random() * 5)];
+  const phase = Number(random().toFixed(3));
+  // As in the sketch: most windows show the whole dancer on white, some are close-ups on pink.
+  const pick = random();
+  const shot = pick < 0.3 ? 'closeup' : 'full';
+  const backdrop = shot === 'closeup' ? 'pink' : pick < 0.8 ? 'white' : pick < 0.93 ? 'pastel' : 'blue';
+  return { effects, size, phase, shot, backdrop };
 }

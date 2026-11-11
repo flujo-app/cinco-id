@@ -38,8 +38,7 @@ export function controlTools(computer) {
       run: async ({ name }) => {
         const sequence = computer.library.findSequence(name);
         if (!sequence) return `There is no sequence called ${name}.`;
-        computer.openSequence(sequence, { size: 'medium' });
-        computer.focus = sequence.key;
+        computer.present(sequence);
         return `${sequence.name} is on screen.`;
       },
     },

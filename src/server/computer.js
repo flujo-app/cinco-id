@@ -96,6 +96,12 @@ export class Computer extends EventEmitter {
     this.learned = {}; // made-up effect words and what they turned out to mean
     this.log = [];
     this.greeted = false;
+    // How long the "Loading BETA, please wait..." bar stays up before the beta sequence appears.
+    this.pace = { beta: 2200, ...(config.pace ?? {}) };
+  }
+
+  wait(ms) {
+    return ms > 0 ? new Promise(resolve => { setTimeout(resolve, ms); }) : Promise.resolve();
   }
 
   // ---------- remembering between runs ----------
@@ -131,7 +137,8 @@ export class Computer extends EventEmitter {
     const text = this.fill(this.phrases[phrase] ?? phrase, values);
     const speak = spoken ? this.fill(this.phrases[phrase] ?? phrase, { ...values, ...spoken }) : text;
     this.log.push({ who: 'computer', text, at: this.now() });
-    return this.send({ type: 'say', text, speak });
+    // `key` tells the screen which stock phrase this is (the beta offer gets the big window).
+    return this.send({ type: 'say', text, speak, ...(this.phrases[phrase] ? { key: phrase } : {}) });
   }
 
   /** Something went wrong behind the scenes: show it in the console, plainly. */
@@ -200,17 +207,26 @@ export class Computer extends EventEmitter {
     };
   }
 
-  openSequence(sequence, { variant = null, size = 'large', effects = [], group = null, phase = 0 } = {}) {
+  /**
+   * Opens one window with a dancer. `shot` is how it is framed, as in the sketch: "full" (the whole
+   * dancer), "closeup" (head and shoulders), "face" (the face fills the window) or "title" (the name
+   * in big letters with the dancer in front). `stack` puts windows of one group in a neat cascade.
+   */
+  openSequence(sequence, { variant = null, size = 'large', effects = [], group = null, phase = 0, shot = 'full', backdrop = null, stack = null, spot = null } = {}) {
     if (this.windows.size >= this.maxWindows) return null;
     const label = variant ? `${sequence.name} (${variant})` : sequence.name;
     return this.openWindow({
       kind: 'sequence',
-      title: `${label}.seq`,
+      title: label,
       sequence: this.view(sequence, variant),
       effects,
       size,
       group,
       phase,
+      shot,
+      backdrop: backdrop ?? (shot === 'closeup' || shot === 'title' ? 'pink' : 'white'),
+      ...(stack ? { stack } : {}),
+      ...(spot ? { spot } : {}),
     });
   }
 
@@ -365,14 +381,23 @@ export class Computer extends EventEmitter {
 
   // ---------- loading ----------
 
+  /**
+   * Puts a sequence on screen the way the sketch does: the whole dancer in one window and a
+   * close-up beside it. An added sequence gets the wide window with the pastel backdrop.
+   */
+  present(sequence, { added = false } = {}) {
+    const first = this.sequenceWindows().length === 0;
+    if (sequence.beta) this.reveal(sequence.key);
+    if (added && !first) this.openSequence(sequence, { size: 'wide', backdrop: 'pastel' });
+    else this.openSequence(sequence, { size: first ? 'large' : 'medium' });
+    this.openSequence(sequence, { shot: 'closeup', size: 'medium' });
+    this.focus = sequence.key;
+    this.currentProject = sequence.projectId;
+  }
+
   async load(command, phrase) {
     if (command.sequence) {
-      const sequence = command.sequence;
-      const first = this.sequenceWindows().length === 0;
-      if (sequence.beta) this.reveal(sequence.key);
-      this.openSequence(sequence, { size: first ? 'large' : 'medium' });
-      this.focus = sequence.key;
-      this.currentProject = sequence.projectId;
+      this.present(command.sequence, { added: phrase === 'added' });
       return this.say(phrase);
     }
     if (command.project) return this.kick({ ...command, sequence: null });
@@ -434,6 +459,8 @@ export class Computer extends EventEmitter {
         effects: variation.effects,
         group: `show:${project.id}`,
         phase: variation.phase,
+        shot: variation.shot,
+        backdrop: variation.backdrop,
       });
     }
     this.send({ type: 'sound', name: 'engage' });
@@ -443,13 +470,23 @@ export class Computer extends EventEmitter {
   multiply(sequence) {
     const level = (this.levels[sequence.key] = (this.levels[sequence.key] ?? 0) + 1);
     const current = this.sequenceWindows(sequence.key)[0]?.sequence.variant ?? null;
-    const count = Math.min(this.maxWindows - this.windows.size, 8);
-    for (let i = 0; i < count; i++) {
-      const variation = showVariation(i, `${sequence.key}:${level}`, ['tumble']);
-      this.openSequence(sequence, { variant: current, size: variation.size, effects: variation.effects, group: `more:${sequence.key}`, phase: variation.phase });
-    }
+    this.cascade(sequence, { variant: current, count: 8, id: `more:${sequence.key}:${level}`, group: `more:${sequence.key}` });
     this.focus = sequence.key;
     return this.say('engaged', { thing: sequence.name });
+  }
+
+  /** A neat pile of windows of one dancer, each a step further down and to the right. */
+  cascade(sequence, { variant = null, count = 6, id, group, shot = 'full', size = 'medium', effects = [], step = null }) {
+    const room = Math.max(0, Math.min(count, this.maxWindows - this.windows.size));
+    for (let i = 0; i < room; i++) {
+      this.openSequence(sequence, {
+        variant, size, shot, group,
+        effects: effects.map(effect => ({ ...effect })),
+        phase: Number(((i * 0.137) % 1).toFixed(3)),
+        stack: { id, index: i, count: room, ...(step ? { step } : {}) },
+      });
+    }
+    return room;
   }
 
   // ---------- effects ----------
@@ -462,6 +499,7 @@ export class Computer extends EventEmitter {
 
   /** Applies a known or made-up effect. Returns false when nothing is on screen. */
   async applyEffect(known, label, sequence, amount = 1) {
+    if (known && EFFECTS[known]?.stage) return this.stageEffect(known, sequence);
     const windows = this.targets(sequence);
     if (!windows.length) return false;
     let name = known;
@@ -482,6 +520,39 @@ export class Computer extends EventEmitter {
       }
     }
     this.send({ type: 'effects.set', windows: windows.map(window => ({ id: window.id, effects: window.effects })) });
+    if (name === 'hatWobble') this.hatWobbleShow(windows[0].sequence);
+    return true;
+  }
+
+  /**
+   * The hat wobble as in the sketch: a pile of windows of the dancer and a close-up of the hat.
+   * Only the first time; asking again just wobbles harder.
+   */
+  hatWobbleShow(onScreen) {
+    const sequence = this.library.sequence(onScreen.key);
+    const group = `hat:${onScreen.key}`;
+    if (!sequence || [...this.windows.values()].some(window => window.group === group)) return;
+    const effects = [{ effect: 'hatWobble', amount: 1 }];
+    const level = (this.levels[group] = (this.levels[group] ?? 0) + 1);
+    this.cascade(sequence, { variant: onScreen.variant, count: 6, id: `${group}:${level}`, group, effects });
+    this.openSequence(sequence, { variant: onScreen.variant, shot: 'closeup', size: 'medium', group, effects: effects.map(effect => ({ ...effect })) });
+  }
+
+  /**
+   * Numbers the computer stages itself. "Flarhgunnstow": the dancer steps out of the window and
+   * dances on the desktop, with three close-ups beside it. Returns false when nothing is on screen.
+   */
+  stageEffect(name, sequence) {
+    const key = sequence?.key ?? (this.focus && this.sequenceWindows(this.focus).length ? this.focus : this.sequenceWindows()[0]?.sequence.key);
+    const found = key ? this.library.sequence(key) : null;
+    if (!found) return false;
+    const variant = this.sequenceWindows(key)[0]?.sequence.variant ?? null;
+    this.closeWindows(window => window.kind === 'sequence' && window.sequence.key === key);
+    const level = (this.levels[`${name}:${key}`] = (this.levels[`${name}:${key}`] ?? 0) + 1);
+    const group = `solo:${key}`;
+    this.openSequence(found, { variant, size: 'large', group, spot: 'left', effects: [{ effect: 'free', amount: 1 }] });
+    this.cascade(found, { variant, count: 3, id: `${group}:${level}`, group, shot: 'closeup', step: [26, 0] });
+    this.focus = key;
     return true;
   }
 
@@ -511,11 +582,17 @@ export class Computer extends EventEmitter {
     return this.say('betaOffer');
   }
 
-  revealBeta(key) {
+  async revealBeta(key) {
     const sequence = this.library.sequence(key);
     if (!sequence) return this.say('notComputing');
     this.reveal(key);
-    this.openSequence(sequence, { size: 'large' });
+    // As in the sketch: "Loading BETA, please wait...", then the face in one window and the
+    // name in big letters in another.
+    const loading = this.openWindow({ kind: 'progress', title: 'Cinco Identity Generator 2.5', text: 'Loading BETA, please wait...', fill: this.pace.beta });
+    await this.wait(this.pace.beta);
+    this.closeWindows(window => window.id === loading.id);
+    this.openSequence(sequence, { shot: 'face', size: 'large' });
+    this.openSequence(sequence, { shot: 'title', size: 'medium' });
     this.focus = key;
     this.currentProject = sequence.projectId;
     this.send({ type: 'sound', name: 'reveal' });
@@ -555,7 +632,7 @@ export class Computer extends EventEmitter {
     if (windows.length) {
       for (const window of windows) {
         window.sequence = view;
-        window.title = `${sequence.name} (${variantName}).seq`;
+        window.title = `${sequence.name} (${variantName})`;
       }
       this.send({ type: 'sequence.swap', windows: windows.map(window => ({ id: window.id, title: window.title, sequence: view })), flourish: announce });
     } else {
@@ -602,21 +679,27 @@ export class Computer extends EventEmitter {
   // ---------- lists ----------
 
   list(what) {
-    const lines = [];
-    if (what !== 'effects') {
-      for (const project of this.library.projects.values()) {
-        const names = project.sequences
-          .map(sequence => (sequence.beta && !this.revealed.has(sequence.key) ? '(beta, not shown yet)' : sequence.name))
-          .join(', ');
-        lines.push(`${project.id}  ${project.name}`, `    ${names || 'no sequences yet'}`);
-      }
+    const learned = Object.values(this.learned).map(entry => entry.label);
+    const effects = [`Effects: ${EFFECT_NAMES.map(name => EFFECTS[name].say[0]).join(', ')}`];
+    if (learned.length) effects.push(`Learned words: ${learned.join(', ')}`);
+    if (what === 'effects') {
+      this.openWindow({ kind: 'note', title: 'Effects', text: effects.join('\n\n') });
+    } else {
+      // The "Please choose a sequence" window: every project with a picture of each dancer.
+      this.closeWindows(window => window.kind === 'chooser');
+      this.openWindow({
+        kind: 'chooser',
+        title: 'Cinco Identity Generator 2.5',
+        projects: [...this.library.projects.values()].map(project => ({
+          id: project.id,
+          name: project.name,
+          sequences: project.sequences.map(sequence => (sequence.beta && !this.revealed.has(sequence.key)
+            ? { hidden: true, name: 'BETA' }
+            : { name: sequence.name, beta: Boolean(sequence.beta), sequence: this.view(sequence) })),
+        })),
+        footnote: what === 'projects' || what === 'sequences' ? '' : effects.join('\n'),
+      });
     }
-    if (what !== 'projects' && what !== 'sequences') {
-      const learned = Object.values(this.learned).map(entry => entry.label);
-      lines.push('', 'Effects:', `    ${EFFECT_NAMES.map(name => EFFECTS[name].say[0]).join(', ')}`);
-      if (learned.length) lines.push('Learned words:', `    ${learned.join(', ')}`);
-    }
-    this.openWindow({ kind: 'note', title: 'Index', text: lines.join('\n') });
     const projects = this.library.projects.size;
     const sequences = this.library.allSequences().length;
     return this.say(`${projects} ${projects === 1 ? 'project' : 'projects'}, ${sequences} ${sequences === 1 ? 'sequence' : 'sequences'}.`);
@@ -690,7 +773,7 @@ export class Computer extends EventEmitter {
     const caller = this.callerName(call.contact);
     const window = this.openWindow({
       kind: 'call',
-      title: call.isVideo ? 'Incoming video call' : 'Incoming call',
+      title: call.isVideo ? 'INCOMING VIDEO CALL' : 'INCOMING CALL',
       call: { ...call, caller },
       canDecline: Boolean(call.test || this.connectors?.canDeclineCalls?.(call.via)),
     });

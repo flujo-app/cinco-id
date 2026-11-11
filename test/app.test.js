@@ -118,8 +118,22 @@ test('other websites cannot give the computer orders', async () => {
       method: 'POST', headers: { 'content-type': 'application/json', origin: base }, body: JSON.stringify({ text: 'load up celery man' }),
     });
     assert.equal(own.status, 200);
-    assert.equal(app.computer.windows.size, 1);
+    assert.equal(app.computer.windows.size, 2, 'the whole dancer and a close-up');
     assert.equal((await fetch(`${base}/projects/4d3d3d3/project.json`)).status, 404, 'only media files are served from projects');
+
+    // Clips are handed out in pieces too: the screen opens the same clip more than once and starts in the middle.
+    const clip = `${base}/projects/4d3d3d3/sequences/oyster/loop.webm`;
+    const whole = Buffer.from(await (await fetch(clip)).arrayBuffer());
+    const piece = await fetch(clip, { headers: { range: 'bytes=100-299' } });
+    assert.equal(piece.status, 206);
+    assert.equal(piece.headers.get('content-range'), `bytes 100-299/${whole.length}`);
+    assert.deepEqual(Buffer.from(await piece.arrayBuffer()), whole.subarray(100, 300));
+    const tail = await fetch(clip, { headers: { range: 'bytes=-50' } });
+    assert.equal(tail.status, 206);
+    assert.deepEqual(Buffer.from(await tail.arrayBuffer()), whole.subarray(whole.length - 50));
+    const rest = await fetch(clip, { headers: { range: `bytes=${whole.length - 10}-` } });
+    assert.equal(rest.headers.get('content-range'), `bytes ${whole.length - 10}-${whole.length - 1}/${whole.length}`);
+    assert.equal((await fetch(clip, { headers: { range: `bytes=${whole.length}-` } })).status, 416, 'past the end');
     assert.equal((await fetch(`${base}/ui/..%2F..%2Fpackage.json`)).status, 403);
   } finally { await stop(); }
 });
@@ -135,7 +149,7 @@ test('the screen connection gets the current picture and live updates', async ()
       socket.on('error', reject);
     });
     assert.equal(messages[0].type, 'snapshot');
-    assert.equal(messages[0].windows.length, 1);
+    assert.equal(messages[0].windows.length, 2);
     assert.deepEqual(messages[0].projects.map(project => project.id), ['4d3d3d3', 'd15c0']);
     socket.send(JSON.stringify({ type: 'command', text: 'wobble' }));
     await new Promise(resolve => setTimeout(resolve, 150));
@@ -206,12 +220,12 @@ test('outside agents can operate the screen through the local door, with the rig
 
     const answer = await client.callTool({ name: 'command', arguments: { text: 'Computer, load up Celery Man please.' } });
     assert.equal(answer.content[0].text, 'Yes, Paul.');
-    assert.equal(app.computer.sequenceWindows('4d3d3d3/celery-man').length, 1);
+    assert.equal(app.computer.sequenceWindows('4d3d3d3/celery-man').length, 2);
 
     await client.callTool({ name: 'apply_effect', arguments: { effect: 'zworp' } });
     assert.ok(app.computer.sequenceWindows()[0].effects.length >= 2);
     const seen = JSON.parse((await client.callTool({ name: 'look', arguments: {} })).content[0].text);
-    assert.deepEqual(seen.onScreen, { 'Celery Man': 1 });
+    assert.deepEqual(seen.onScreen, { 'Celery Man': 2 });
     await client.close();
   } finally { await stop(); }
 });
@@ -245,7 +259,7 @@ test('the brain uses the screen tools, and outside tools need a Yes first', asyn
     await app.computer.hear('put the shellfish on and blorptangle it');
     assert.equal(app.computer.log.at(-1).text, 'Yes, Paul.');
     const oyster = app.computer.sequenceWindows('4d3d3d3/oyster');
-    assert.equal(oyster.length, 1);
+    assert.equal(oyster.length, 2);
     assert.ok(oyster[0].effects.length >= 2, 'the made-up word became effects');
     assert.ok(requests[0].tools.some(tool => tool.function.name === 'mail__send'), 'outside tools are offered to the brain');
     assert.match(requests[0].messages[0].content, /Paul/);
