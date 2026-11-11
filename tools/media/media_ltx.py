@@ -2,16 +2,21 @@
 
 The keyframe pipeline is given the same picture as its first and last frame,
 so the dance ends in the pose it started with and the clip loops.
-Weights come from a read-only, already verified cache; nothing is downloaded.
+Weights come from a verified volume mounted at /ltx: either the owner's existing cache
+(read-only) or our own copy, which `prepare_weights` downloads from the publisher's own
+Hugging Face account at the pinned revision and checks file by file against the pinned
+SHA-256 checksums. Both use the same layout and the same ready.json record.
 """
 from __future__ import annotations
 
+import hashlib
 import io
 import json
 import os
 import subprocess
 import tempfile
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from media_settings import FPS, LTX_CODE_REVISION, LTX_FILES, LTX_REPO, LTX_REVISION
@@ -20,12 +25,98 @@ CACHE_ROOT = Path("/ltx")
 SOURCE = Path("/opt/ltx-2")
 
 
+def snapshot_dir() -> Path:
+    return CACHE_ROOT / "hf" / ("models--" + LTX_REPO.replace("/", "--")) / "snapshots" / LTX_REVISION
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(64 * 1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def _missing_files() -> list[str]:
+    missing = []
+    for role, (filename, size, _sha) in LTX_FILES.items():
+        path = snapshot_dir() / filename
+        if not path.exists() or path.stat().st_size != size:
+            missing.append(role)
+    return missing
+
+
+def access_problem(token: str | None) -> str | None:
+    """None if Hugging Face lets this sign-in download LTX-2.5, else a short reason code."""
+    from huggingface_hub import HfApi
+    from huggingface_hub.errors import GatedRepoError, HfHubHTTPError, RepositoryNotFoundError
+    try:
+        HfApi().auth_check(LTX_REPO, token=token or False)
+    except GatedRepoError:
+        return "not-accepted" if token else "no-token"
+    except RepositoryNotFoundError:
+        return "bad-token" if token else "no-token"
+    except HfHubHTTPError as error:
+        status = getattr(getattr(error, "response", None), "status_code", None)
+        if status in (401, 403):
+            return "bad-token" if token else "no-token"
+        raise RuntimeError(f"Hugging Face could not be reached (answer {status})") from None
+    return None
+
+
+def prepare_weights(commit) -> dict:
+    """Get the six pinned LTX-2.5 files into our own volume and check every one.
+
+    Files that are already complete are not downloaded again. The Hugging Face token, if
+    the person stored one in Modal, arrives as HF_TOKEN and is never printed or returned.
+    """
+    started = time.monotonic()
+    token = (os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN") or "").strip() or None
+    missing = _missing_files()
+    downloaded = False
+    if missing:
+        problem = access_problem(token)
+        if problem:
+            return {"status": "needs-sign-in", "problem": problem, "missing": missing}
+        from huggingface_hub import snapshot_download
+        folder = Path(snapshot_download(LTX_REPO, revision=LTX_REVISION, cache_dir=str(CACHE_ROOT / "hf"),
+                                        allow_patterns=[filename for filename, _, _ in LTX_FILES.values()],
+                                        token=token or False, max_workers=6))
+        commit()
+        if folder.resolve() != snapshot_dir().resolve():
+            raise RuntimeError("LTX-2.5 landed in an unexpected folder")
+        downloaded = True
+    download_seconds = time.monotonic() - started
+
+    def check(item):
+        role, (filename, size, sha) = item
+        path = snapshot_dir() / filename
+        if path.stat().st_size != size or _sha256(path) != sha:
+            target = path.resolve()
+            for bad in {path, target}:
+                bad.unlink(missing_ok=True)
+            raise RuntimeError(f"{LTX_REPO}/{filename} did not match its published checksum and was removed; "
+                               f"run --prepare again to download it once more")
+        return role, {"filename": filename, "size": size, "sha256": sha}
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        checked = dict(pool.map(check, LTX_FILES.items()))
+    commit()
+    record = {"status": "ready", "repo_id": LTX_REPO, "revision": LTX_REVISION, "files": checked,
+              "downloaded_now": downloaded, "download_seconds": round(download_seconds, 1),
+              "total_seconds": round(time.monotonic() - started, 1)}
+    (CACHE_ROOT / "ready.json").write_text(json.dumps(record, indent=2), encoding="utf-8")
+    commit()
+    return {key: record[key] for key in ("status", "downloaded_now", "download_seconds", "total_seconds")} | {
+        "files": len(checked)}
+
+
 def model_paths() -> dict[str, str]:
     """Locate the pinned files and check them against the cache's own verification record."""
     ready = json.loads((CACHE_ROOT / "ready.json").read_text(encoding="utf-8"))
     if ready.get("repo_id") != LTX_REPO or ready.get("revision") != LTX_REVISION or ready.get("status") != "ready":
         raise RuntimeError("The motion model cache is not the pinned version")
-    snapshot = CACHE_ROOT / "hf" / ("models--" + LTX_REPO.replace("/", "--")) / "snapshots" / LTX_REVISION
+    snapshot = snapshot_dir()
     paths = {}
     for role, (filename, size, sha) in LTX_FILES.items():
         record = ready["files"][role]
