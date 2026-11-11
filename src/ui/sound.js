@@ -155,6 +155,25 @@ const spoken = []; // what was said aloud and how it went, for the voice check
 export function setVoiceMode(next) { mode = next; }
 export function setMuted(value) { muted = value; if (value) { quiet(); play('ring-stop'); } }
 export function voiceLog() { return spoken.slice(-40); }
+export function isMuted() { return muted; }
+
+/** Plays one sample of a voice for the Setup window: a sound file, or the browser voice saying `text`. */
+export async function sample(blob, text) {
+  if (muted) return;
+  quiet();
+  if (!(blob instanceof Blob)) return browserSpeak(text);
+  const url = URL.createObjectURL(blob);
+  try {
+    await new Promise(resolve => {
+      const player = new Audio(url);
+      player.onended = resolve;
+      player.onerror = resolve;
+      player.play().catch(resolve);
+    });
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
 
 function browserSpeak(text) {
   return new Promise(resolve => {

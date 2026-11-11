@@ -5,4 +5,6 @@ contextBridge.exposeInMainWorld('shell', {
   setIgnoreMouse: ignore => ipcRenderer.send('ignore-mouse', Boolean(ignore)),
   onToggleListen: callback => ipcRenderer.on('toggle-listen', () => callback()),
   openFolder: which => ipcRenderer.invoke('open-folder', String(which)),
+  restart: () => ipcRenderer.invoke('restart'),
+  onOpenSetup: callback => ipcRenderer.on('open-setup', () => callback()),
 });

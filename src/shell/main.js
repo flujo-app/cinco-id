@@ -1,6 +1,6 @@
 // The desktop shell: starts the computer and shows its screen, either as a normal window with
 // its own Win95 desktop, or as a see-through layer on top of your real desktop ("overlay").
-import { app, BrowserWindow, Menu, Tray, globalShortcut, ipcMain, nativeImage, screen, session, shell } from 'electron';
+import { app, BrowserWindow, Menu, Tray, globalShortcut, ipcMain, nativeImage, safeStorage, screen, session, shell } from 'electron';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -80,6 +80,7 @@ function buildTray() {
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: overlay ? 'Show as a window' : 'Show on top of my desktop', click: switchMode },
     { label: 'Talk (Ctrl+Alt+Space)', click: () => window?.webContents.send('toggle-listen') },
+    { label: 'Setup...', click: () => window?.webContents.send('open-setup') },
     { type: 'separator' },
     { label: 'Quit', click: () => app.quit() },
   ]));
@@ -120,8 +121,13 @@ app.whenReady().then(async () => {
   harness = await createApp({
     rootDir,
     dataDir,
-    overrides: port ? { port: Number(port) } : {},
-    parts: flag('no-print') ? {} : { printer: printPage },
+    overrides: {
+      ...(port ? { port: Number(port) } : {}),
+      // For tests: the Setup window must not open by surprise.
+      ...(flag('no-setup') ? { setup: { onFirstStart: false } } : {}),
+    },
+    // Keys typed into the Setup window are encrypted with the Windows sign-in (safeStorage).
+    parts: { secretCipher: safeStorage, ...(flag('no-print') ? {} : { printer: printPage }) },
   });
   await harness.listen();
   for (const note of harness.notes) console.log(`Note: ${note}`);
@@ -134,6 +140,11 @@ app.whenReady().then(async () => {
     if (!folder) return 'There is no such folder.';
     await fs.mkdir(folder, { recursive: true });
     return (await shell.openPath(folder)) || null;
+  });
+  // "Restart now" in the Setup window, for settings that only take effect on a fresh start.
+  ipcMain.handle('restart', () => {
+    app.relaunch();
+    app.quit();
   });
 
   // The screen may use the microphone; nothing else gets asked for.

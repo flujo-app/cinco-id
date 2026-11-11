@@ -1,10 +1,23 @@
 // Shared by the checks in test/ui: how to start a test copy of the app, either from this folder
 // (electron .) or from a packaged copy (--exe <path to CINCO ID.exe>), always silently, without a
 // tray icon, on its own port and with its own data folder, so nothing touches the real one.
+import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+
+/** The wanted port if nothing else uses it, otherwise the next free one (another copy may be running). */
+export async function freePort(wanted) {
+  for (let port = wanted; port < wanted + 50; port++) {
+    const free = await new Promise(resolve => {
+      const probe = net.createServer().once('error', () => resolve(false)).once('listening', () => probe.close(() => resolve(true)));
+      probe.listen(port, '127.0.0.1');
+    });
+    if (free) return port;
+  }
+  throw new Error(`No free port near ${wanted}.`);
+}
 
 /** Removes "--name value" from the argument list and returns the value (or null). */
 export function takeOption(args, name) {

@@ -17,10 +17,12 @@
   },
   "brain": {
     "enabled": true,
+    "engine": "api",
     "baseUrl": "https://api.openai.com/v1",
     "apiKeyEnv": "OPENAI_API_KEY",
     "model": "gpt-6-luna"
   },
+  "media": { "python": "python" },
   "mcpServers": {
     "example": { "command": "npx", "args": ["-y", "some-mcp-server"], "disabled": true }
   },

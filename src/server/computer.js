@@ -42,6 +42,8 @@ export const DEFAULT_PHRASES = {
   noVoice: 'There is no voice called {name} on this computer.',
   noVoices: 'I have only this voice, {operator}.',
   voiceChanged: 'This is my voice now, {operator}.',
+  setupOpen: 'Setup.',
+  settingsSaved: 'Settings saved, {operator}.',
 };
 
 const PENDING_MS = 90_000;
@@ -254,6 +256,7 @@ export class Computer extends EventEmitter {
       case 'focus': this.focus = command.sequence.key; return;
       case 'list': return this.list(command.what);
       case 'mute': return this.send({ type: 'quiet' });
+      case 'setup': this.send({ type: 'setup.open' }); return this.say('setupOpen');
       case 'music': this.send({ type: 'music', on: command.on }); return this.say('ok');
       case 'voice.list': return this.listVoices();
       case 'voice.use': return this.useVoice(command.name);

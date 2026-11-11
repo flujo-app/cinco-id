@@ -9,6 +9,7 @@ const SIZES = {
   printout: [300, 400],
   note: [350, null],
   progress: [330, null],
+  setup: [560, 384],
 };
 const TITLE_H = 22;
 const WINDOW_EFFECTS = new Set(['drift', 'conga', 'giant', 'tiny', 'free']);
@@ -79,6 +80,7 @@ export class WindowManager {
     }
     if (desc.kind === 'console') return [16, clampY(H - height - 16)];
     if (desc.kind === 'dialog') return [clampX((W - width) / 2), clampY(H * 0.32)];
+    if (desc.kind === 'setup') return [clampX((W - width) / 2), clampY((H - height) / 2)];
     if (desc.kind === 'call') return [clampX(W - width - 24 - (this.cascade % 4) * 18), 24 + (this.cascade++ % 4) * 18];
     if (desc.kind === 'printout') return [clampX(W - width - 60), clampY(H * 0.2)];
     if (desc.kind === 'progress') return [clampX(W - width - 24), clampY(H - 150)];
@@ -138,7 +140,7 @@ export class WindowManager {
     if (!record) return;
     for (const other of this.windows.values()) other.frame.classList.toggle('active', other === record);
     // The console, questions and calls always stay above the dancers, however many there are.
-    const layer = { console: 1_000_000, dialog: 3_000_000, call: 2_000_000 }[record.desc.kind] ?? 0;
+    const layer = { console: 1_000_000, dialog: 3_000_000, call: 2_000_000, setup: 2_500_000 }[record.desc.kind] ?? 0;
     record.frame.style.zIndex = String(layer + ++this.z);
   }
 

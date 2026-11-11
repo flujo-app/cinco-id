@@ -12,7 +12,7 @@ import { _electron as electron } from 'playwright-core';
 import os from 'node:os';
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
-import { launchOptions, takeOption } from './launch.mjs';
+import { freePort, launchOptions, takeOption } from './launch.mjs';
 import { closeWindow, dialogsOf, leftSwitchedOff, windows } from './desktop.mjs';
 
 const args = process.argv.slice(2);
@@ -25,7 +25,7 @@ const OUR_PROGRAMS = new Set(['electron', 'CINCO ID']);
 const before = windows();
 const dialogsBefore = new Set(dialogsOf(before, PRINT_PROGRAMS).map(window => window.handle));
 const app = await electron.launch(launchOptions({
-  exe, port: 19785, print: true, dataDir: path.join(temp, 'data'),
+  exe, port: await freePort(19785), print: true, dataDir: path.join(temp, 'data'),
   env: { CINCO_ID_CONFIG: 'none', CINCO_ID_OPERATOR: 'Paul' },
 }));
 const problems = [];
