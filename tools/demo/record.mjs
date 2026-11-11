@@ -3,7 +3,7 @@
 // three minutes. Nothing else on the PC is recorded: the picture is the app's own window
 // content, the sound is the app's own sound.
 //
-//   node tools/demo/record.mjs [output.mp4] [--keep-frames]
+//   node tools/demo/record.mjs [output.mp4] [--voice robot|zira|<part of a Windows voice name>] [--keep-frames]
 //
 // Needs ffmpeg on the PATH. Uses a fresh temporary data folder, so your own settings and
 // projects are not touched.
@@ -16,6 +16,8 @@ import { freePort, root } from '../../test/ui/launch.mjs';
 
 const args = process.argv.slice(2);
 const keepFrames = args.includes('--keep-frames');
+const voiceAt = args.indexOf('--voice');
+const voiceWanted = voiceAt >= 0 ? String(args.splice(voiceAt, 2)[1] ?? 'robot').toLowerCase() : 'robot';
 const output = path.resolve(args.find(arg => !arg.startsWith('--')) ?? path.join(root, 'docs', 'demo.mp4'));
 const work = await fs.mkdtemp(path.join(os.tmpdir(), 'cinco-id-demo-'));
 const framesDir = path.join(work, 'frames');
@@ -86,8 +88,16 @@ try {
   await setup.locator('input[name=operator]').pressSequentially('Paul', { delay: 90 });
   await next();
   await pause(900); // Voice
-  const robot = setup.locator('input[name=voice]').first();
-  await robot.check().catch(() => {});
+  // Pick the voice for this recording: the robot voice, or a Windows voice by (part of) its name.
+  const voiceValue = await setup.locator('input[name=voice]').evaluateAll((inputs, wanted) => {
+    const values = inputs.map(input => input.value);
+    const found = wanted === 'robot'
+      ? values.find(value => value === 'voder')
+      : values.find(value => value.toLowerCase().startsWith('windows:') && value.toLowerCase().includes(wanted));
+    return found ?? values[0];
+  }, voiceWanted);
+  console.log(`Voice for this recording: ${voiceValue}`);
+  await setup.locator(`input[name=voice][value="${voiceValue}"]`).check();
   await setup.locator('button[data-role=say-something]').click();
   await page.waitForFunction(() => !/Speaking/.test(document.querySelector('.kind-setup .setup-status')?.textContent ?? ''), null, { timeout: 30000 }).catch(() => {});
   await next(3200);
@@ -96,6 +106,7 @@ try {
   const claude = setup.locator('input[name=brain][value=claude-cli]');
   if (await claude.count()) await claude.check();
   await next(2200);
+  await next(3200); // WhatsApp
   await next(3000); // New dancers
   await pause(2200); // Finish
   await setup.locator('button[data-role=finish]').click();
