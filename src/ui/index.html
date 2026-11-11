@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Beta Sequence</title>
+  <link rel="stylesheet" href="/ui/style.css">
+</head>
+<body>
+  <div id="desktop">
+    <div id="icons"></div>
+  </div>
+  <div id="start-menu" hidden>
+    <div class="start-stripe"><span>Beta Sequence</span></div>
+    <div class="start-items">
+      <button data-action="console">Computer</button>
+      <button data-action="index">Index of projects</button>
+      <button data-action="music">Music on / off</button>
+      <button data-action="test-call">Test call</button>
+      <hr>
+      <button data-action="clear">Close all windows</button>
+    </div>
+  </div>
+  <div id="taskbar">
+    <button id="start"><span class="start-logo"></span>Start</button>
+    <div id="tasks"></div>
+    <div id="tray">
+      <button id="tray-mic" title="Hold to talk (or hold the space bar)">&#127908;</button>
+      <button id="tray-mute" title="Voice on / off">&#128266;</button>
+      <span id="clock"></span>
+    </div>
+  </div>
+  <script type="module" src="/ui/main.js"></script>
+</body>
+</html>

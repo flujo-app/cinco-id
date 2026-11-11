@@ -1,0 +1,31 @@
+{
+  "operator": "Paul",
+  "defaultProject": "4d3d3d3",
+  "maxWindows": 96,
+  "voice": {
+    "tts": { "engine": "voder", "python": "python", "voderPath": "C:/path/to/voder", "pitch": 104, "rate": 1.02 },
+    "stt": {
+      "engine": "whisper",
+      "python": "C:/path/to/venv/Scripts/python.exe",
+      "model": "large-v3",
+      "device": "cuda",
+      "computeType": "int8_float16",
+      "hubCache": "C:/path/to/model/cache",
+      "offline": true,
+      "language": "en"
+    }
+  },
+  "brain": {
+    "enabled": true,
+    "baseUrl": "https://api.openai.com/v1",
+    "apiKeyEnv": "OPENAI_API_KEY",
+    "model": "gpt-6-luna"
+  },
+  "mcpServers": {
+    "example": { "command": "npx", "args": ["-y", "some-mcp-server"], "disabled": true }
+  },
+  "events": {
+    "whatsapp": { "secret": "whsec_<made by: npm run whatsapp:link>", "messages": "off", "declineTool": null }
+  },
+  "printouts": { "printer": false }
+}
