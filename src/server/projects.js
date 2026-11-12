@@ -76,6 +76,7 @@ async function loadSequence(projectId, dir, id) {
     media,
     variants,
     description: spec.description ?? '',
+    music: typeof spec.music === 'string' ? spec.music : null, // which of the band's tunes plays for this dancer
   };
 }
 

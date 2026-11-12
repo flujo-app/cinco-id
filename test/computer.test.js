@@ -330,3 +330,13 @@ test('new projects get a hex name and what was revealed is remembered', async ()
     await fs.rm(temp, { recursive: true, force: true });
   }
 });
+
+test('each dancer of the demo brings its own tune', async () => {
+  const { computer } = await boot();
+  await computer.hear('load up oyster');
+  assert.equal(computer.sequenceWindows()[0].sequence.music, 'house');
+  await computer.hear('load up celery man');
+  assert.equal(computer.sequenceWindows('4d3d3d3/celery-man')[0].sequence.music, 'funk');
+  assert.equal(computer.view(computer.library.sequence('4d3d3d3/tayne')).music, 'drive');
+  assert.equal(computer.view(computer.library.sequence('d15c0/grandmother')).music, null, 'others get one picked by the screen');
+});

@@ -110,6 +110,7 @@ export async function loadConfig(rootDir, overrides = {}, { dataDir = null } = {
   if (env.CINCO_ID_OPERATOR) fromEnv.operator = env.CINCO_ID_OPERATOR;
   if (env.CINCO_ID_STATE_DIR) fromEnv.stateDir = env.CINCO_ID_STATE_DIR;
   if (env.CINCO_ID_PROJECTS_DIR) fromEnv.projectsDir = env.CINCO_ID_PROJECTS_DIR;
+  if (env.CINCO_ID_MUSIC_DIR) fromEnv.musicDir = env.CINCO_ID_MUSIC_DIR;
   if (env.CINCO_ID_PRINTOUTS_DIR) fromEnv.printouts = { dir: env.CINCO_ID_PRINTOUTS_DIR };
   if (/^(1|true|yes|off)$/i.test(env.CINCO_ID_NO_SETUP ?? '')) fromEnv.setup = { onFirstStart: false };
   const config = merge(merge(merge(defaults, fromFile), fromEnv), overrides);

@@ -35,8 +35,9 @@ There is also [the same demo with the robot voice](docs/demo-robot-voice.mp4).
   says "I'm afraid I can't do that."
 - **Printouts.** "Give me a printout of Oyster smiling" is a real Windows print job, sent to the PDF printer: a
   photo with a small caption, as in the sketch.
-- **Disco.** Music plays while anything dances, and "more disco" steps it up, twice. Put your own music files into
-  the music folder and it plays those; otherwise a small band made on the spot plays.
+- **Music.** Cheesy 1990s synth loops play while anything dances, a different tune for each dancer: synth-funk for
+  Celery Man, a house beat for Oyster (a whole song of two and a half minutes), four-on-the-floor for Tayne. "More disco" steps it up, twice. The app plays
+  them itself; put your own music files into the music folder and it plays those instead.
 - **Far too many windows.** Up to 96 at once, in the look of the sketch's computer: whole dancers on white,
   close-ups on pink that follow the head, title cards in big chunky letters, neat piles of windows, about twenty
   effects, and any made-up word becomes its own effect and is remembered. In see-through mode the windows and
@@ -45,7 +46,7 @@ There is also [the same demo with the robot voice](docs/demo-robot-voice.mp4).
 
 ## Install
 
-Download `CINCO-ID-Setup-2.5.4.exe` from the [releases page](https://github.com/flujo-app/cinco-id/releases) and run
+Download `CINCO-ID-Setup-2.5.5.exe` from the [releases page](https://github.com/flujo-app/cinco-id/releases) and run
 it. It installs for your Windows user only and does not need administrator rights. You get a Start menu entry and a
 desktop shortcut; "CINCO ID" in Windows' "Apps" list removes it again (your settings and projects stay in your app
 data folder).
@@ -135,7 +136,8 @@ everything also works offline.
 **Your own music.** Open the Menu, choose "Music folder" and put one to three sound files there (mp3, ogg or wav).
 In name order they become the three disco levels: the first plays for "disco", the next for "more disco", the third
 for "mooooore discooooo". With one file, that one plays throughout. Restart CINCO ID after changing the files.
-With an empty folder, a small band made on the spot plays.
+With an empty folder, the built-in band plays its own tunes. A dancer picks its tune with `"music": "funk"`,
+`"house"` or `"drive"` in its `sequence.json`; without that line it gets one of the three.
 
 ## Linking your accounts
 
