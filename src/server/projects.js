@@ -108,6 +108,7 @@ export class Library {
         dir,
         name: spec.name ?? entry.name,
         description: spec.description ?? '',
+        music: typeof spec.music === 'string' ? spec.music : null, // which of the band's themes plays for this dancer
         show: { windows: 24, effects: ['tumble'], drift: true, ...(spec.show ?? {}) },
         sequences,
       });

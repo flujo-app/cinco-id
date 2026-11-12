@@ -531,6 +531,8 @@ function handle(action) {
       break;
     case 'window.open':
       wm.open(action.window);
+      // The dancer that was just put on screen brings its own tune (a big show keeps the tune playing).
+      if (action.window.kind === 'sequence' && !action.window.group) sound.setTheme(action.window.sequence.music ?? sound.THEME_NAMES[[...action.window.sequence.key].reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % sound.THEME_NAMES.length]);
       updateMusic();
       break;
     case 'window.close':

@@ -1,6 +1,7 @@
 {
   "name": "Oyster",
   "aliases": ["oister", "oysters", "the oyster"],
+  "music": "house",
   "description": "A cheerful person in a pearl-grey satin shirt with a pearl necklace, doing a smooth happy groove. An invented person.",
   "beta": false,
   "hatLine": 0.2,

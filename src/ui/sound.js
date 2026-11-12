@@ -172,7 +172,7 @@ function startSynth() {
   musicTimer = setInterval(() => {
     while (nextStepTime < audio().currentTime + 0.25) {
       scheduleStep(musicStep++, nextStepTime);
-      nextStepTime += STEP;
+      nextStepTime += stepSeconds();
     }
   }, 60);
 }
@@ -225,33 +225,61 @@ export function musicStatus() {
   };
 }
 
-// ---------- the fallback: a small looping band ----------
-// An original eight-bar disco groove, played by the app itself: four-on-the-floor kick, claps on
-// two and four, open hi-hats on the off-beats, an octave-jumping bass, choppy rhythm chords, a
-// string pad with a rising run at the end of the phrase, a little hook and the odd "pew" drum.
+// ---------- the built-in band ----------
+// Original loops in the style of 1990s computer demos and corporate training tapes, played by the
+// app itself on a drum machine and a few synths. Each dancer can have its own theme:
+//   funk   mid-tempo, bouncy synth-funk with bright keyboard stabs
+//   house  a little faster and heavier, with a pulsing bass
+//   drive  a punchy four-on-the-floor beat with rhythmic chords and a big bass groove
+// "More disco" adds a high melody, then more percussion and a busy arpeggio.
 
-const TEMPO = 122;
 const MUSIC_LEVEL = 1.25; // how loud the band is; it steps back while the computer speaks
-const STEP = 60 / TEMPO / 4; // one sixteenth note, in seconds
 const hz = note => 440 * 2 ** ((note - 69) / 12); // note numbers as on a piano keyboard, 69 = concert A
-// One chord per bar: A minor 7, D minor 7, G 7, C major 7. `bass` is the root, `tones` the chord.
-const BARS = [
-  { bass: 45, tones: [57, 60, 64, 67] },
-  { bass: 38, tones: [57, 60, 62, 65] },
-  { bass: 43, tones: [55, 59, 62, 65] },
-  { bass: 36, tones: [55, 59, 60, 64] },
-];
-const HOOK = { // bar of the eight-bar phrase -> { step in the bar: note }
-  0: { 0: 76, 3: 79, 6: 81, 10: 79 },
-  2: { 0: 74, 3: 77, 6: 79, 11: 74 },
-  4: { 0: 76, 3: 79, 6: 81, 8: 84, 11: 81 },
-  6: { 0: 74, 3: 77, 6: 79 },
+// Per theme: tempo; one chord per bar (`bass` root, `tones` chord); on which sixteenths the drums
+// hit; the bass line as { sixteenth: [semitones above the root, length in sixteenths] }; when the
+// keyboard stabs; and the melody as { bar: { sixteenth: note } }.
+const THEMES = {
+  funk: {
+    tempo: 110,
+    bars: [{ bass: 36, tones: [60, 64, 67] }, { bass: 41, tones: [60, 65, 69] }, { bass: 43, tones: [59, 62, 67] }, { bass: 36, tones: [60, 64, 67, 72] }],
+    kick: [0, 7, 8, 10], snare: [4, 12], hat: [0, 2, 4, 6, 8, 10, 12, 14], openHat: [14],
+    bass: { 0: [0, 1.4], 3: [0, 0.8], 4: [12, 0.8], 6: [0, 0.8], 7: [7, 0.8], 10: [0, 1.2], 12: [12, 0.8], 14: [10, 0.8], 15: [11, 0.8] },
+    bassSound: { type: 'square', cutoff: 900, q: 4 },
+    stabs: [2, 6, 9, 14], stabSound: { type: 'sawtooth', cutoff: 3600, detune: 9, volume: 0.06 },
+    lead: { 0: { 0: 84, 2: 88, 4: 91, 7: 88 }, 1: { 0: 84, 2: 89, 4: 93, 7: 89 }, 2: { 0: 83, 2: 86, 4: 91, 6: 93, 8: 91 }, 3: { 0: 88, 3: 84, 6: 79, 8: 84 } },
+  },
+  house: {
+    tempo: 126,
+    bars: [{ bass: 33, tones: [57, 60, 64] }, { bass: 33, tones: [57, 60, 64] }, { bass: 29, tones: [57, 60, 65] }, { bass: 31, tones: [55, 59, 62] }],
+    kick: [0, 4, 8, 12], snare: [4, 12], hat: [1, 3, 5, 7, 9, 11, 13, 15], openHat: [2, 6, 10, 14],
+    bass: Object.fromEntries([1, 2, 3, 5, 6, 7, 9, 10, 11, 13, 14, 15].map(step => [step, [step % 4 === 2 ? 12 : 0, 0.8]])),
+    bassSound: { type: 'sawtooth', cutoff: 700, q: 6 },
+    stabs: [3, 6, 11], stabSound: { type: 'square', cutoff: 2200, detune: 5, volume: 0.05 },
+    lead: { 0: { 0: 81, 3: 81, 6: 84 }, 1: { 0: 83, 3: 81, 6: 76 }, 2: { 0: 81, 3: 81, 6: 84 }, 3: { 0: 86, 4: 83, 8: 79 } },
+  },
+  drive: {
+    tempo: 122,
+    bars: [{ bass: 41, tones: [56, 60, 63] }, { bass: 37, tones: [56, 61, 65] }, { bass: 39, tones: [58, 63, 67] }, { bass: 36, tones: [55, 60, 64] }],
+    kick: [0, 4, 8, 12], snare: [4, 12], hat: [0, 2, 4, 6, 8, 10, 12, 14], openHat: [2, 6, 10, 14],
+    bass: { 0: [0, 1.6], 3: [0, 0.8], 6: [12, 1.2], 8: [0, 1.2], 10: [7, 0.8], 11: [0, 0.8], 14: [12, 0.8] },
+    bassSound: { type: 'sawtooth', cutoff: 800, q: 3 },
+    stabs: [0, 3, 6, 10, 12], stabSound: { type: 'sawtooth', cutoff: 2800, detune: 7, volume: 0.055 },
+    lead: { 0: { 0: 80, 4: 84, 8: 87 }, 1: { 0: 85, 4: 84, 8: 80 }, 2: { 0: 82, 4: 87, 8: 91 }, 3: { 0: 88, 6: 84, 12: 79 } },
+  },
 };
-const STRING_RUN = [69, 71, 72, 74, 76, 79, 81, 84]; // the rising run in the last half of bar eight
+export const THEME_NAMES = Object.keys(THEMES);
+let theme = THEMES.funk;
+let nextTheme = null; // a theme change waits for the next bar line
 let musicTimer = null;
 let musicStep = 0;
 let nextStepTime = 0;
 let musicOn = false;
+const stepSeconds = () => 60 / theme.tempo / 4; // one sixteenth note
+
+/** Which theme the band plays; unknown names keep the current one. Changes on the next bar line. */
+export function setTheme(name) {
+  if (THEMES[name] && THEMES[name] !== theme) nextTheme = THEMES[name];
+}
 
 /** One or more notes through a filter: the bass, the rhythm chords, the strings and the hook. */
 function synth(notes, start, length, { type = 'sawtooth', volume = 0.05, filter = 'lowpass', cutoff = 1200, cutoffTo = null, q = 1, attack = 0.005, detune = 0 } = {}) {
@@ -281,63 +309,39 @@ function synth(notes, start, length, { type = 'sawtooth', volume = 0.05, filter 
 }
 
 function scheduleStep(step, time) {
+  if (nextTheme && step % 16 === 0) { theme = nextTheme; nextTheme = null; }
+  const STEP = stepSeconds();
   const inBar = step % 16;
-  const barInPhrase = Math.floor(step / 16) % 8;
-  const bar = BARS[barInPhrase % BARS.length];
+  const barNumber = Math.floor(step / 16);
+  const bar = theme.bars[barNumber % theme.bars.length];
 
-  // drums
-  if (inBar % 4 === 0) { // the kick on every beat
-    tone(150, time, 0.24, { type: 'sine', volume: 0.5, to: musicGain, slideTo: 46 });
+  // the drum machine
+  if (theme.kick.includes(inBar)) {
+    tone(150, time, 0.22, { type: 'sine', volume: 0.5, to: musicGain, slideTo: 46 });
     noise(time, 0.012, { volume: 0.1, frequency: 3500, q: 0.6, to: musicGain });
   }
-  if (inBar === 4 || inBar === 12) { // the clap on two and four
-    for (const late of [0, 0.011, 0.023]) noise(time + late, 0.05, { volume: 0.2, frequency: 1500, q: 0.9, to: musicGain });
-    noise(time + 0.03, 0.14, { volume: 0.11, frequency: 1300, q: 0.7, to: musicGain });
+  if (theme.snare.includes(inBar)) {
+    noise(time, 0.13, { volume: 0.2, frequency: 1900, q: 0.6, to: musicGain });
+    tone(190, time, 0.09, { type: 'triangle', volume: 0.14, to: musicGain, slideTo: 120 });
   }
-  noise(time, 0.03, { volume: inBar % 2 ? 0.07 : 0.1, frequency: 9500, q: 0.6, to: musicGain }); // ticking hi-hat
-  if (inBar % 4 === 2) noise(time, 0.17, { volume: 0.2, frequency: 8500, q: 0.5, to: musicGain }); // open hi-hat off the beat
-  if ((barInPhrase === 3 && inBar === 14) || (barInPhrase === 7 && inBar === 6)) {
-    tone(900, time, 0.28, { type: 'sine', volume: 0.2, to: musicGain, slideTo: 170 }); // "pew"
-  }
+  if (theme.hat.includes(inBar)) noise(time, 0.03, { volume: 0.085, frequency: 9500, q: 0.6, to: musicGain });
+  if (theme.openHat.includes(inBar)) noise(time, 0.15, { volume: 0.15, frequency: 8500, q: 0.5, to: musicGain });
+  if (barNumber % 4 === 3 && inBar >= 12) tone(260 - (inBar - 12) * 35, time, 0.11, { type: 'sine', volume: 0.2, to: musicGain, slideTo: 90 }); // tom fill
 
-  // bass: root on the beat, an octave up between the beats, a little walk into the next bar
-  if (inBar % 2 === 0) {
-    const up = inBar % 4 === 2;
-    synth(bar.bass + (up ? 12 : 0), time, STEP * (up ? 1.3 : 1.7), { volume: 0.24, cutoff: up ? 900 : 650, cutoffTo: 180, q: 3 });
-  }
-  if (inBar === 15) synth(bar.bass + 7, time, STEP * 0.9, { volume: 0.18, cutoff: 800, cutoffTo: 200, q: 3 });
+  // the bass
+  const bassNote = theme.bass[inBar];
+  if (bassNote) synth(bar.bass + bassNote[0], time, STEP * bassNote[1], { ...theme.bassSound, volume: 0.22, cutoffTo: 180 });
 
-  // choppy rhythm chords with a moving "wah"
-  if ([3, 6, 7, 11, 14].includes(inBar)) {
-    const wah = 1100 + 900 * Math.sin((step / 16) * Math.PI);
-    synth(bar.tones, time, STEP * (inBar === 7 ? 0.5 : 0.75), { volume: 0.07, filter: 'bandpass', cutoff: Math.max(500, wah), q: 2.5 });
-  }
+  // bright keyboard stabs
+  if (theme.stabs.includes(inBar)) synth(bar.tones, time, STEP * 0.9, { ...theme.stabSound, attack: 0.004 });
 
-  // strings: a pad through each bar, and the rising run that leads back to the start
-  if (inBar === 0) synth(bar.tones.slice(1).map(note => note + 12), time, STEP * 15.5, { volume: 0.03, cutoff: 2400, attack: 0.09, detune: 7 });
-  if (barInPhrase === 7 && inBar >= 8) synth(STRING_RUN[inBar - 8] + 12, time, STEP * 1.4, { volume: 0.09, cutoff: 3200, attack: 0.012, detune: 6 });
-
-  // the hook
-  const note = HOOK[barInPhrase]?.[inBar];
-  if (note) synth(note, time, STEP * 2.2, { type: 'square', volume: 0.09, cutoff: 2600, cutoffTo: 900, q: 1.5 });
-
-  // a string stab on the last off-beat of every bar
-  if (inBar === 14) synth(bar.tones.map(tone => tone + 12), time, STEP * 1.2, { volume: 0.045, cutoff: 3000, attack: 0.008, detune: 8 });
-
-  // "More disco" adds layers.
-  if (discoLevel >= 2) {
-    if ([0, 3, 6, 10, 12].includes(inBar)) { // cowbell
-      tone(800, time, 0.09, { type: 'square', volume: 0.07, to: musicGain });
-      tone(540, time, 0.09, { type: 'square', volume: 0.05, to: musicGain });
-    }
-    if (note) synth(note + 12, time, STEP * 1.6, { type: 'square', volume: 0.05, cutoff: 3600, cutoffTo: 1400, q: 1.2 }); // the hook, doubled higher
-  }
+  // "More disco": first the high melody, then more percussion and a busy arpeggio
+  const note = theme.lead[barNumber % 4]?.[inBar];
+  if (discoLevel >= 2 && note) synth(note, time, STEP * 1.8, { type: 'square', volume: 0.075, cutoff: 4200, cutoffTo: 1600, q: 1.2 });
   if (discoLevel >= 3) {
-    // a busy clavinet-like line between the beats
-    if (inBar % 2 === 1 || inBar === 8) synth(bar.tones[(inBar * 7) % 4] - 12, time, STEP * 0.55, { type: 'square', volume: 0.06, filter: 'bandpass', cutoff: 1500, q: 3 });
-    // extra claps into every fourth bar, and a rising whoop back to the top of the phrase
-    if (barInPhrase % 4 === 3 && (inBar === 13 || inBar === 15)) noise(time, 0.05, { volume: 0.18, frequency: 1500, q: 0.9, to: musicGain });
-    if (barInPhrase === 7 && inBar === 12) tone(300, time, STEP * 4, { type: 'sine', volume: 0.16, to: musicGain, slideTo: 1800 });
+    synth(bar.tones[inBar % bar.tones.length] + 12 + (inBar % 8 >= 4 ? 12 : 0), time, STEP * 0.6, { type: 'triangle', volume: 0.05, cutoff: 5000 });
+    if (inBar % 4 === 2) { tone(800, time, 0.07, { type: 'square', volume: 0.05, to: musicGain }); tone(540, time, 0.07, { type: 'square', volume: 0.04, to: musicGain }); }
+    if (inBar === 4 || inBar === 12) noise(time + 0.012, 0.06, { volume: 0.14, frequency: 1500, q: 0.9, to: musicGain });
   }
 }
 
@@ -360,6 +364,9 @@ export function moreDisco() {
   } catch { /* sound is a nicety */ }
   return discoLevel;
 }
+
+/** Back to the plain tune (after the desktop was cleared). */
+export function resetDisco() { discoLevel = 1; }
 
 export function music(on) {
   const ctx = audio();

@@ -203,6 +203,7 @@ export class Computer extends EventEmitter {
       hatLine: variant?.hatLine ?? sequence.hatLine,
       puppet: variant ? variant.puppet : sequence.puppet,
       clip: media?.clip.url ?? null,
+      music: sequence.music ?? null,
       stills: Object.fromEntries(Object.entries(media?.stills ?? {}).map(([name, still]) => [name, still.url])),
     };
   }
