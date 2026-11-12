@@ -256,6 +256,31 @@ const THEMES = {
     bassSound: { type: 'sawtooth', cutoff: 700, q: 6 },
     stabs: [3, 6, 11], stabSound: { type: 'square', cutoff: 2200, detune: 5, volume: 0.05 },
     lead: { 0: { 0: 81, 3: 81, 6: 84 }, 1: { 0: 83, 3: 81, 6: 76 }, 2: { 0: 81, 3: 81, 6: 84 }, 3: { 0: 86, 4: 83, 8: 79 } },
+    // This one is a whole song, about two and a half minutes, then it starts over. Each part says
+    // how many bars it lasts and what plays: drums (kick, snare, hats), bass, stabs, lead, arp
+    // (the fast run of notes), pad (long soft chords) and roll (the drum roll of a build-up).
+    song: [
+      { bars: 4, play: 'kick hats' },
+      { bars: 4, play: 'kick hats bass' },
+      { bars: 8, play: 'kick snare hats bass stabs' },
+      { bars: 8, play: 'kick snare hats bass stabs lead' },
+      { bars: 4, play: 'hats bass pad roll' },
+      { bars: 16, play: 'kick snare hats bass stabs lead arp', chorus: true },
+      { bars: 8, play: 'pad lead bass', half: true },
+      { bars: 4, play: 'hats bass pad roll' },
+      { bars: 16, play: 'kick snare hats bass stabs lead arp pad', chorus: true },
+      { bars: 4, play: 'kick hats bass stabs' },
+      { bars: 4, play: 'kick hats', last: true },
+    ],
+    // The chorus: F, G, A minor, A minor, then F, G, C, E, with its own melody over eight bars.
+    chorusBars: [
+      { bass: 29, tones: [57, 60, 65] }, { bass: 31, tones: [55, 59, 62] }, { bass: 33, tones: [57, 60, 64] }, { bass: 33, tones: [57, 60, 64] },
+      { bass: 29, tones: [57, 60, 65] }, { bass: 31, tones: [55, 59, 62] }, { bass: 36, tones: [55, 60, 64] }, { bass: 28, tones: [56, 59, 64] },
+    ],
+    chorusLead: {
+      0: { 0: 84, 4: 81, 8: 77, 12: 81 }, 1: { 0: 83, 4: 79, 8: 74, 12: 79 }, 2: { 0: 81, 3: 84, 6: 88, 10: 84 }, 3: { 0: 81, 8: 76 },
+      4: { 0: 84, 4: 81, 8: 77, 12: 81 }, 5: { 0: 83, 4: 86, 8: 91, 12: 86 }, 6: { 0: 88, 3: 84, 6: 79, 10: 84 }, 7: { 0: 83, 4: 80, 8: 76, 12: 80 },
+    },
   },
   drive: {
     tempo: 122,
@@ -308,36 +333,61 @@ function synth(notes, start, length, { type = 'sawtooth', volume = 0.05, filter 
   }
 }
 
+/** Which part of a theme's song a bar belongs to (themes without a song just loop). */
+function partAt(barNumber) {
+  if (!theme.song) return null;
+  const total = theme.song.reduce((sum, part) => sum + part.bars, 0);
+  let at = barNumber % total;
+  for (const part of theme.song) {
+    if (at < part.bars) return { ...part, at, plays: new Set(part.play.split(' ')) };
+    at -= part.bars;
+  }
+  return null;
+}
+
 function scheduleStep(step, time) {
-  if (nextTheme && step % 16 === 0) { theme = nextTheme; nextTheme = null; }
+  if (nextTheme && step % 16 === 0) { theme = nextTheme; nextTheme = null; musicStep = step = 0; }
   const STEP = stepSeconds();
   const inBar = step % 16;
   const barNumber = Math.floor(step / 16);
-  const bar = theme.bars[barNumber % theme.bars.length];
+  const part = partAt(barNumber);
+  const on = name => !part || part.plays.has(name);
+  const bars = part?.chorus ? theme.chorusBars : theme.bars;
+  const bar = bars[(part ? part.at : barNumber) % bars.length];
 
   // the drum machine
-  if (theme.kick.includes(inBar)) {
+  if (on('kick') && theme.kick.includes(inBar) && !(part?.last && part.at === part.bars - 1 && inBar > 0)) {
     tone(150, time, 0.22, { type: 'sine', volume: 0.5, to: musicGain, slideTo: 46 });
     noise(time, 0.012, { volume: 0.1, frequency: 3500, q: 0.6, to: musicGain });
   }
-  if (theme.snare.includes(inBar)) {
+  if (on('snare') && theme.snare.includes(inBar)) {
     noise(time, 0.13, { volume: 0.2, frequency: 1900, q: 0.6, to: musicGain });
     tone(190, time, 0.09, { type: 'triangle', volume: 0.14, to: musicGain, slideTo: 120 });
   }
-  if (theme.hat.includes(inBar)) noise(time, 0.03, { volume: 0.085, frequency: 9500, q: 0.6, to: musicGain });
-  if (theme.openHat.includes(inBar)) noise(time, 0.15, { volume: 0.15, frequency: 8500, q: 0.5, to: musicGain });
-  if (barNumber % 4 === 3 && inBar >= 12) tone(260 - (inBar - 12) * 35, time, 0.11, { type: 'sine', volume: 0.2, to: musicGain, slideTo: 90 }); // tom fill
+  if (on('hats') && theme.hat.includes(inBar)) noise(time, 0.03, { volume: 0.085, frequency: 9500, q: 0.6, to: musicGain });
+  if (on('hats') && theme.openHat.includes(inBar)) noise(time, 0.15, { volume: 0.15, frequency: 8500, q: 0.5, to: musicGain });
+  if (on('snare') && barNumber % 4 === 3 && inBar >= 12) tone(260 - (inBar - 12) * 35, time, 0.11, { type: 'sine', volume: 0.2, to: musicGain, slideTo: 90 }); // tom fill
 
   // the bass
-  const bassNote = theme.bass[inBar];
-  if (bassNote) synth(bar.bass + bassNote[0], time, STEP * bassNote[1], { ...theme.bassSound, volume: 0.22, cutoffTo: 180 });
+  // a build-up: the drum roll gets faster over the part, with a rising whoosh into the next one
+  if (part?.plays.has('roll')) {
+    const every = part.at < part.bars / 2 ? 4 : part.at < part.bars - 1 ? 2 : 1;
+    if (inBar % every === 0) noise(time, 0.07, { volume: 0.1 + 0.1 * (part.at / part.bars), frequency: 1900, q: 0.6, to: musicGain });
+    if (part.at === part.bars - 1 && inBar === 0) tone(220, time, STEP * 16, { type: 'sawtooth', volume: 0.05, to: musicGain, slideTo: 1760 });
+  }
+  // long soft chords
+  if (part?.plays.has('pad') && inBar === 0) synth(bar.tones.map(note => note + 12), time, STEP * 15.5, { volume: 0.035, cutoff: 2600, attack: 0.12, detune: 8 });
+
+  const bassNote = part?.half ? (inBar === 0 ? [0, 6] : null) : theme.bass[inBar];
+  if (on('bass') && bassNote) synth(bar.bass + bassNote[0], time, STEP * bassNote[1], { ...theme.bassSound, volume: 0.22, cutoffTo: 180 });
 
   // bright keyboard stabs
-  if (theme.stabs.includes(inBar)) synth(bar.tones, time, STEP * 0.9, { ...theme.stabSound, attack: 0.004 });
+  if (on('stabs') && theme.stabs.includes(inBar)) synth(bar.tones, time, STEP * 0.9, { ...theme.stabSound, attack: 0.004 });
 
   // "More disco": first the high melody, then more percussion and a busy arpeggio
-  const note = theme.lead[barNumber % 4]?.[inBar];
-  if (discoLevel >= 2 && note) synth(note, time, STEP * 1.8, { type: 'square', volume: 0.075, cutoff: 4200, cutoffTo: 1600, q: 1.2 });
+  const note = part?.chorus ? theme.chorusLead[part.at % 8]?.[inBar] : theme.lead[(part ? part.at : barNumber) % 4]?.[inBar];
+  if ((part ? part.plays.has('lead') || discoLevel >= 2 : discoLevel >= 2) && note) synth(note, time, STEP * 1.8, { type: 'square', volume: 0.075, cutoff: 4200, cutoffTo: 1600, q: 1.2 });
+  if (part?.plays.has('arp') && discoLevel < 3) synth(bar.tones[inBar % bar.tones.length] + 12 + (inBar % 8 >= 4 ? 12 : 0), time, STEP * 0.6, { type: 'triangle', volume: 0.04, cutoff: 5000 });
   if (discoLevel >= 3) {
     synth(bar.tones[inBar % bar.tones.length] + 12 + (inBar % 8 >= 4 ? 12 : 0), time, STEP * 0.6, { type: 'triangle', volume: 0.05, cutoff: 5000 });
     if (inBar % 4 === 2) { tone(800, time, 0.07, { type: 'square', volume: 0.05, to: musicGain }); tone(540, time, 0.07, { type: 'square', volume: 0.04, to: musicGain }); }
